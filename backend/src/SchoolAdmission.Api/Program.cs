@@ -15,6 +15,8 @@ var connectionString = builder.Configuration.GetConnectionString("Default")
 builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
 builder.Services.AddSingleton(HoldSettings.FromConfiguration(builder.Configuration));
 builder.Services.AddScoped<AdmissionService>();
+builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
+    policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddHostedService<HoldExpirySweeper>();
@@ -30,6 +32,7 @@ await DatabaseMigrator.MigrateAsync(app.Services);
 
 app.UseExceptionHandler();
 app.UseApiStatusCodePages();
+app.UseCors();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapClassEndpoints();
