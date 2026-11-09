@@ -43,6 +43,24 @@ public class AdmissionService
         where class_id = {0} and student_id = {1} and status in ('HELD', 'CONFIRMED')
         """;
 
+    private const string HoldStateSql = """
+        select id as "HoldId", class_id as "ClassId", student_id as "StudentId",
+               case when status = 'HELD' and expires_at <= now() then 'EXPIRED' else status end as "Status",
+               expires_at as "ExpiresAt"
+        from holds
+        where id = {0}
+        """;
+
+    private const string StudentHoldsSql = """
+        select h.id as "HoldId", h.class_id as "ClassId", c.name as "ClassName",
+               case when h.status = 'HELD' and h.expires_at <= now() then 'EXPIRED' else h.status end as "Status",
+               h.expires_at as "ExpiresAt"
+        from holds h
+        join classes c on c.id = h.class_id
+        where h.student_id = {0}
+        order by h.created_at desc, h.id
+        """;
+
     private readonly AppDbContext _db;
     private readonly HoldSettings _holdSettings;
 
@@ -180,6 +198,117 @@ public class AdmissionService
         return new HoldResponse(hold.Id, hold.ClassId, hold.StudentId, hold.Status.ToString(), hold.ExpiresAt);
     }
 
+    public async Task<HoldResponse> GetHoldAsync(string holdId, CancellationToken cancellationToken = default)
+    {
+        var rows = await _db.Database
+            .SqlQueryRaw<HoldStateRow>(HoldStateSql, holdId)
+            .ToListAsync(cancellationToken);
+
+        var row = rows.FirstOrDefault();
+
+        return row is null
+            ? throw ApiException.HoldNotFound(holdId)
+            : new HoldResponse(row.HoldId, row.ClassId, row.StudentId, row.Status, row.ExpiresAt);
+    }
+
+    public async Task<IReadOnlyList<HoldSummaryResponse>> ListStudentHoldsAsync(
+        string studentId,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await _db.Database
+            .SqlQueryRaw<HoldSummaryRow>(StudentHoldsSql, studentId)
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(row => new HoldSummaryResponse(row.HoldId, row.ClassId, row.ClassName, row.Status, row.ExpiresAt))
+            .ToList();
+    }
+
+    public async Task<ConfirmHoldResponse> ConfirmHoldAsync(
+        string holdId,
+        string studentId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+
+        var hold = await LockHoldRowAsync(holdId, cancellationToken)
+            ?? throw ApiException.HoldNotFound(holdId);
+
+        if (hold.StudentId != studentId)
+        {
+            throw ApiException.Forbidden();
+        }
+
+        if (hold.Status == nameof(HoldStatus.CONFIRMED))
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new ConfirmHoldResponse(holdId, nameof(HoldStatus.CONFIRMED));
+        }
+
+        if (hold.Status == nameof(HoldStatus.CANCELLED))
+        {
+            throw ApiException.HoldNotActive();
+        }
+
+        if (hold.Status == nameof(HoldStatus.EXPIRED))
+        {
+            throw ApiException.HoldExpired();
+        }
+
+        var now = await _db.NowAsync(cancellationToken);
+
+        if (hold.ExpiresAt <= now)
+        {
+            await _db.Database.ExecuteSqlRawAsync(
+                "update holds set status = 'EXPIRED' where id = {0} and status = 'HELD'",
+                new object[] { holdId },
+                cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
+            throw ApiException.HoldExpired();
+        }
+
+        await _db.Database.ExecuteSqlRawAsync(
+            "update holds set status = 'CONFIRMED', confirmed_at = {1} where id = {0} and status = 'HELD'",
+            new object[] { holdId, now },
+            cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+
+        return new ConfirmHoldResponse(holdId, nameof(HoldStatus.CONFIRMED));
+    }
+
+    public async Task CancelHoldAsync(string holdId, string studentId, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+
+        var hold = await LockHoldRowAsync(holdId, cancellationToken)
+            ?? throw ApiException.HoldNotFound(holdId);
+
+        if (hold.StudentId != studentId)
+        {
+            throw ApiException.Forbidden();
+        }
+
+        if (hold.Status == nameof(HoldStatus.CONFIRMED))
+        {
+            throw ApiException.HoldNotActive();
+        }
+
+        if (hold.Status == nameof(HoldStatus.HELD))
+        {
+            var now = await _db.NowAsync(cancellationToken);
+            var nextStatus = hold.ExpiresAt <= now ? nameof(HoldStatus.EXPIRED) : nameof(HoldStatus.CANCELLED);
+
+            await _db.Database.ExecuteSqlRawAsync(
+                "update holds set status = {1} where id = {0} and status = 'HELD'",
+                new object[] { holdId, nextStatus },
+                cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     private async Task<int> LockClassRowAsync(string classId, CancellationToken cancellationToken)
     {
         var connection = _db.Database.GetDbConnection();
@@ -208,6 +337,44 @@ public class AdmissionService
         return result is null ? -1 : (int)result;
     }
 
+    private async Task<LockedHold?> LockHoldRowAsync(string holdId, CancellationToken cancellationToken)
+    {
+        var connection = _db.Database.GetDbConnection();
+
+        if (connection.State != ConnectionState.Open)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            "select student_id, status, expires_at from holds where id = @hold_id for update";
+
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "hold_id";
+        parameter.Value = holdId;
+        command.Parameters.Add(parameter);
+
+        var transaction = _db.Database.CurrentTransaction;
+        if (transaction is not null)
+        {
+            command.Transaction = transaction.GetDbTransaction();
+        }
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        var studentId = reader.GetString(0);
+        var status = reader.GetString(1);
+        var expiresAt = new DateTimeOffset(reader.GetDateTime(2), TimeSpan.Zero);
+
+        return new LockedHold(studentId, status, expiresAt);
+    }
+
     private static ClassResponse ToResponse(ClassSeatsRow row) => new(
         row.Id,
         row.Name,
@@ -215,4 +382,6 @@ public class AdmissionService
         row.HeldSeats,
         row.ConfirmedSeats,
         row.AvailableSeats);
+
+    private sealed record LockedHold(string StudentId, string Status, DateTimeOffset ExpiresAt);
 }
