@@ -25,6 +25,9 @@ export default function App() {
 
         <AppShell.Main>
           <div className="shell-main">
+            <nav className="mobile-nav">
+              <NavRail />
+            </nav>
             <div className="content">
               <Routes>
                 <Route path="/" element={<ClassesPage />} />

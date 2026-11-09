@@ -451,3 +451,37 @@ textarea::placeholder {
   opacity: 1 !important;
 }
 
+
+.mobile-nav {
+  display: none;
+}
+
+@media (max-width: 47.99em) {
+  .mobile-nav {
+    display: flex;
+    gap: 0.4rem;
+    margin-bottom: 1rem;
+    padding: 0.25rem;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+
+  .mobile-nav .rail-link {
+    flex: 1;
+    justify-content: center;
+    color: var(--ink-2);
+  }
+
+  .mobile-nav .rail-link:hover {
+    background: #f1f5f9;
+    color: var(--ink);
+  }
+
+  .mobile-nav .rail-link.active {
+    background: var(--accent);
+    color: #ffffff;
+    box-shadow: none;
+  }
+}
+
