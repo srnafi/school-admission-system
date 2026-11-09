@@ -451,3 +451,10 @@ textarea {
     display: none;
   }
 }
+
+input::placeholder,
+textarea::placeholder {
+  color: #5b6472 !important;
+  opacity: 1 !important;
+}
+
