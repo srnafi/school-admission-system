@@ -31,8 +31,8 @@ var app = builder.Build();
 
 await DatabaseMigrator.MigrateAsync(app.Services);
 
-app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseExceptionHandler();
+app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseApiStatusCodePages();
 app.UseCors();
 
