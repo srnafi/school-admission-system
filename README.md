@@ -47,13 +47,13 @@ It must be an address the browser can reach, not a compose service name.
 Backend tests, including the concurrency test, run against the compose PostgreSQL:
 
 ```
-docker compose --profile test run --rm backend-tests
+docker compose --profile test run --rm --build backend-tests
 ```
 
 Frontend tests:
 
 ```
-docker compose --profile test run --rm frontend-tests
+docker compose --profile test run --rm --build frontend-tests
 ```
 
 To run them without Docker on a machine that has the SDKs:
