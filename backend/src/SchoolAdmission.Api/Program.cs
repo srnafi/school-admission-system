@@ -1,5 +1,6 @@
 using System.Text.Encodings.Web;
 using Microsoft.EntityFrameworkCore;
+using SchoolAdmission.Api.Background;
 using SchoolAdmission.Api.Data;
 using SchoolAdmission.Api.Endpoints;
 using SchoolAdmission.Api.Errors;
@@ -16,6 +17,7 @@ builder.Services.AddSingleton(HoldSettings.FromConfiguration(builder.Configurati
 builder.Services.AddScoped<AdmissionService>();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
+builder.Services.AddHostedService<HoldExpirySweeper>();
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
