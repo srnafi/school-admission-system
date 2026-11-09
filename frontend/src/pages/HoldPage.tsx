@@ -54,17 +54,19 @@ export function HoldPage() {
         <section className="card">
           <h2>{className ?? `${labels.classNameLabel} ${hold.classId}`}</h2>
 
-          <p className="row">
-            <span>{labels.status}</span>
-            <StatusChip status={hold.status} expiresAt={hold.expiresAt} />
-          </p>
+          <div className="hold-stats">
+            <div>
+              <span className="label">{labels.status}</span>
+              <StatusChip status={hold.status} expiresAt={hold.expiresAt} />
+            </div>
 
-          {status === 'HELD' ? (
-            <p className="row">
-              <span>{labels.timeLeft}</span>
-              <b className="mono">{formatRemaining(remaining)}</b>
-            </p>
-          ) : null}
+            {status === 'HELD' ? (
+              <div>
+                <span className="label">{labels.timeLeft}</span>
+                <b className="countdown">{formatRemaining(remaining)}</b>
+              </div>
+            ) : null}
+          </div>
 
           <div className="actions">
             <button

@@ -7,7 +7,12 @@ export function TopBar() {
 
   return (
     <header className="topbar">
-      <h1>{labels.title}</h1>
+      <div className="brand">
+        <span className="mark" aria-hidden="true">
+          ভ
+        </span>
+        <h1>{labels.title}</h1>
+      </div>
 
       <div className="student-id">
         <label htmlFor="student-id">{labels.studentId}</label>

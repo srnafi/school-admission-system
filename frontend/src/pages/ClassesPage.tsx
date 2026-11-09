@@ -87,24 +87,38 @@ export function ClassesPage() {
         <ul className="class-list">
           {classesQuery.data?.map((item) => {
             const applying = apply.isPending && apply.variables?.id === item.id;
+            const occupied = Math.round(((item.totalSeats - item.availableSeats) / item.totalSeats) * 100);
 
             return (
               <li key={item.id} className="card class-item">
-                <div className="class-name">{item.name}</div>
+                <div className="class-head">
+                  <h3>{item.name}</h3>
+                  <span className={item.availableSeats > 0 ? 'pill pill-open' : 'pill pill-full'}>
+                    {item.availableSeats > 0 ? `${item.availableSeats} ${labels.seatsAvailable}` : labels.full}
+                  </span>
+                </div>
 
-                <div className="seat-counts">
-                  <span>
-                    {labels.seatsTotal} <b>{item.totalSeats}</b>
-                  </span>
-                  <span>
-                    {labels.seatsHeld} <b>{item.heldSeats}</b>
-                  </span>
-                  <span>
-                    {labels.seatsConfirmed} <b>{item.confirmedSeats}</b>
-                  </span>
-                  <span>
-                    {labels.seatsAvailable} <b>{item.availableSeats}</b>
-                  </span>
+                <dl className="seat-grid">
+                  <div>
+                    <dt>{labels.seatsTotal}</dt>
+                    <dd>{item.totalSeats}</dd>
+                  </div>
+                  <div>
+                    <dt>{labels.seatsHeld}</dt>
+                    <dd>{item.heldSeats}</dd>
+                  </div>
+                  <div>
+                    <dt>{labels.seatsConfirmed}</dt>
+                    <dd>{item.confirmedSeats}</dd>
+                  </div>
+                  <div>
+                    <dt>{labels.seatsAvailable}</dt>
+                    <dd>{item.availableSeats}</dd>
+                  </div>
+                </dl>
+
+                <div className="bar" aria-hidden="true">
+                  <span style={{ width: `${occupied}%` }} />
                 </div>
 
                 <button
