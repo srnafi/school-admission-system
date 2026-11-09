@@ -1,4 +1,7 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using Npgsql;
 using SchoolAdmission.Api.Contracts;
 using SchoolAdmission.Api.Data;
 using SchoolAdmission.Api.Domain;
@@ -27,11 +30,26 @@ public class AdmissionService
         ) h on h.class_id = c.id
         """;
 
-    private readonly AppDbContext _db;
+    private const string SeatUsageSql = """
+        select count(*) filter (where status = 'CONFIRMED') as "ConfirmedSeats",
+               count(*) filter (where status = 'HELD' and expires_at > {1}) as "HeldSeats"
+        from holds
+        where class_id = {0}
+        """;
 
-    public AdmissionService(AppDbContext db)
+    private const string ActiveHoldSql = """
+        select count(*)::int as "Value"
+        from holds
+        where class_id = {0} and student_id = {1} and status in ('HELD', 'CONFIRMED')
+        """;
+
+    private readonly AppDbContext _db;
+    private readonly HoldSettings _holdSettings;
+
+    public AdmissionService(AppDbContext db, HoldSettings holdSettings)
     {
         _db = db;
+        _holdSettings = holdSettings;
     }
 
     public async Task<ClassResponse> CreateClassAsync(CreateClassRequest? request, CancellationToken cancellationToken = default)
@@ -95,6 +113,99 @@ public class AdmissionService
         var row = rows.FirstOrDefault();
 
         return row is null ? throw ApiException.ClassNotFound(classId) : ToResponse(row);
+    }
+
+    public async Task<HoldResponse> CreateHoldAsync(
+        string classId,
+        string studentId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+
+        // the class row lock serialises every application for this class
+        var totalSeats = await LockClassRowAsync(classId, cancellationToken);
+        if (totalSeats < 0)
+        {
+            throw ApiException.ClassNotFound(classId);
+        }
+
+        var now = await _db.NowAsync(cancellationToken);
+
+        await _db.Database.ExecuteSqlRawAsync(
+            "update holds set status = 'EXPIRED' where class_id = {0} and status = 'HELD' and expires_at <= {1}",
+            new object[] { classId, now },
+            cancellationToken);
+
+        var activeHolds = await _db.Database
+            .SqlQueryRaw<int>(ActiveHoldSql, classId, studentId)
+            .SingleAsync(cancellationToken);
+
+        if (activeHolds > 0)
+        {
+            throw ApiException.AlreadyApplied();
+        }
+
+        var usage = await _db.Database
+            .SqlQueryRaw<SeatUsageRow>(SeatUsageSql, classId, now)
+            .SingleAsync(cancellationToken);
+
+        if (usage.HeldSeats + usage.ConfirmedSeats >= totalSeats)
+        {
+            throw ApiException.NoSeats();
+        }
+
+        var hold = new Hold
+        {
+            Id = Ids.NewHoldId(),
+            ClassId = classId,
+            StudentId = studentId,
+            Status = HoldStatus.HELD,
+            CreatedAt = now,
+            ExpiresAt = now.AddSeconds(_holdSettings.DurationSeconds)
+        };
+
+        _db.Holds.Add(hold);
+
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            throw ApiException.AlreadyApplied();
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+
+        return new HoldResponse(hold.Id, hold.ClassId, hold.StudentId, hold.Status.ToString(), hold.ExpiresAt);
+    }
+
+    private async Task<int> LockClassRowAsync(string classId, CancellationToken cancellationToken)
+    {
+        var connection = _db.Database.GetDbConnection();
+
+        if (connection.State != ConnectionState.Open)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "select total_seats from classes where id = @class_id for update";
+
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "class_id";
+        parameter.Value = classId;
+        command.Parameters.Add(parameter);
+
+        var transaction = _db.Database.CurrentTransaction;
+        if (transaction is not null)
+        {
+            command.Transaction = transaction.GetDbTransaction();
+        }
+
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+
+        return result is null ? -1 : (int)result;
     }
 
     private static ClassResponse ToResponse(ClassSeatsRow row) => new(
