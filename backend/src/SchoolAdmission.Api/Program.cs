@@ -12,7 +12,8 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("Default")
     ?? throw new InvalidOperationException("Connection string 'Default' is not configured.");
 
-builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(ConnectionStringOptions.WithPoolSizeLimit(connectionString)));
 builder.Services.AddSingleton(HoldSettings.FromConfiguration(builder.Configuration));
 builder.Services.AddScoped<AdmissionService>();
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
