@@ -1,4 +1,18 @@
 import { useState } from 'react';
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Group,
+  Loader,
+  Progress,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { ApiError, api } from '../api/client';
@@ -42,9 +56,11 @@ export function ClassesPage() {
   const canCreate = name.trim().length > 0 && Number.isInteger(seatCount) && seatCount > 0 && !createClass.isPending;
 
   return (
-    <div className="page">
-      <section className="card">
-        <h2>{labels.createClassTitle}</h2>
+    <Stack gap="lg">
+      <Card withBorder radius="md" padding="lg">
+        <Title order={4} mb="md">
+          {labels.createClassTitle}
+        </Title>
 
         <form
           onSubmit={(event) => {
@@ -54,87 +70,120 @@ export function ClassesPage() {
             }
           }}
         >
-          <label>
-            {labels.className}
-            <input value={name} onChange={(event) => setName(event.target.value)} placeholder={labels.classNamePlaceholder} />
-          </label>
-
-          <label>
-            {labels.totalSeats}
-            <input
+          <Group align="flex-end" gap="md" wrap="wrap">
+            <TextInput
+              label={labels.className}
+              placeholder={labels.classNamePlaceholder}
+              value={name}
+              onChange={(event) => setName(event.currentTarget.value)}
+              style={{ flex: '1 1 18rem' }}
+            />
+            <TextInput
+              label={labels.totalSeats}
               value={seats}
               inputMode="numeric"
-              onChange={(event) => setSeats(event.target.value.replace(/\D/g, ''))}
+              onChange={(event) => setSeats(event.currentTarget.value.replace(/\D/g, ''))}
+              w={140}
             />
-          </label>
-
-          <button type="submit" disabled={!canCreate}>
-            {labels.createClass}
-          </button>
+            <Button type="submit" disabled={!canCreate} loading={createClass.isPending}>
+              {labels.createClass}
+            </Button>
+          </Group>
         </form>
 
-        {createClass.isError ? <p className="error">{errorMessage((createClass.error as ApiError).code)}</p> : null}
-      </section>
+        {createClass.isError ? (
+          <Alert color="red" variant="light" mt="md">
+            {errorMessage((createClass.error as ApiError).code)}
+          </Alert>
+        ) : null}
+      </Card>
 
-      <section>
-        <h2>{labels.navClasses}</h2>
+      <div>
+        <Group justify="space-between" mb="sm">
+          <Title order={4}>{labels.navClasses}</Title>
+          {classesQuery.isFetching ? <Loader size="xs" /> : null}
+        </Group>
 
-        {!isValid ? <p className="hint">{labels.needStudentId}</p> : null}
-        {classesQuery.isLoading ? <p className="hint">{labels.loading}</p> : null}
-        {classesQuery.isError ? <p className="error">{errorMessage((classesQuery.error as ApiError).code)}</p> : null}
-        {classesQuery.data?.length === 0 ? <p className="hint">{labels.noClasses}</p> : null}
+        {!isValid ? (
+          <Alert color="blue" variant="light" mb="md">
+            {labels.needStudentId}
+          </Alert>
+        ) : null}
 
-        <ul className="class-list">
+        {classesQuery.isError ? (
+          <Alert color="red" variant="light" mb="md">
+            {errorMessage((classesQuery.error as ApiError).code)}
+          </Alert>
+        ) : null}
+
+        {classesQuery.isLoading ? <Text c="dimmed">{labels.loading}</Text> : null}
+
+        {classesQuery.data?.length === 0 ? <Text c="dimmed">{labels.noClasses}</Text> : null}
+
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
           {classesQuery.data?.map((item) => {
             const applying = apply.isPending && apply.variables?.id === item.id;
             const occupied = Math.round(((item.totalSeats - item.availableSeats) / item.totalSeats) * 100);
 
             return (
-              <li key={item.id} className="card class-item">
-                <div className="class-head">
-                  <h3>{item.name}</h3>
-                  <span className={item.availableSeats > 0 ? 'pill pill-open' : 'pill pill-full'}>
+              <Card key={item.id} withBorder radius="md" padding="md" shadow="sm">
+                <Group justify="space-between" align="flex-start" mb="sm" wrap="nowrap">
+                  <Text fw={600} lh={1.35}>
+                    {item.name}
+                  </Text>
+                  <Badge color={item.availableSeats > 0 ? 'teal' : 'red'} variant="light">
                     {item.availableSeats > 0 ? `${item.availableSeats} ${labels.seatsAvailable}` : labels.full}
-                  </span>
-                </div>
+                  </Badge>
+                </Group>
 
-                <dl className="seat-grid">
+                <SimpleGrid cols={4} spacing="xs" mb="sm">
                   <div>
-                    <dt>{labels.seatsTotal}</dt>
-                    <dd>{item.totalSeats}</dd>
+                    <Text size="xs" c="dimmed">
+                      {labels.seatsTotal}
+                    </Text>
+                    <Text fw={700}>{item.totalSeats}</Text>
                   </div>
                   <div>
-                    <dt>{labels.seatsHeld}</dt>
-                    <dd>{item.heldSeats}</dd>
+                    <Text size="xs" c="dimmed">
+                      {labels.seatsHeld}
+                    </Text>
+                    <Text fw={700}>{item.heldSeats}</Text>
                   </div>
                   <div>
-                    <dt>{labels.seatsConfirmed}</dt>
-                    <dd>{item.confirmedSeats}</dd>
+                    <Text size="xs" c="dimmed">
+                      {labels.seatsConfirmed}
+                    </Text>
+                    <Text fw={700}>{item.confirmedSeats}</Text>
                   </div>
                   <div>
-                    <dt>{labels.seatsAvailable}</dt>
-                    <dd>{item.availableSeats}</dd>
+                    <Text size="xs" c="dimmed">
+                      {labels.seatsAvailable}
+                    </Text>
+                    <Text fw={700}>{item.availableSeats}</Text>
                   </div>
-                </dl>
+                </SimpleGrid>
 
-                <div className="bar" aria-hidden="true">
-                  <span style={{ width: `${occupied}%` }} />
-                </div>
+                <Progress value={occupied} size="sm" radius="xl" mb="md" color="indigo" />
 
-                <button
-                  type="button"
+                <Button
+                  fullWidth
                   disabled={!isValid || item.availableSeats <= 0 || apply.isPending}
+                  loading={applying}
                   onClick={() => apply.mutate(item)}
                 >
-                  {item.availableSeats <= 0 ? labels.full : applying ? labels.applying : labels.apply}
-                </button>
-              </li>
+                  {item.availableSeats <= 0 ? labels.full : labels.apply}
+                </Button>
+              </Card>
             );
           })}
-        </ul>
+        </SimpleGrid>
 
-        {apply.isError ? <p className="error">{errorMessage((apply.error as ApiError).code)}</p> : null}
-      </section>
-    </div>
+        {apply.isError ? (
+          <Alert color="red" variant="light" mt="md">
+            {errorMessage((apply.error as ApiError).code)}
+          </Alert>
+        ) : null}
+      </div>
+    </Stack>
   );
 }

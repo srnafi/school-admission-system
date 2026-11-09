@@ -1,7 +1,8 @@
+import { Alert, Anchor, Button, Card, Group, Stack, Text, Title } from '@mantine/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { ApiError, api } from '../api/client';
-import { StatusChip } from '../components/StatusChip';
+import { StatusBadge } from '../components/StatusBadge';
 import { formatRemaining, useCountdown } from '../hooks/useCountdown';
 import { labels, errorMessage } from '../strings';
 import { useStudentId } from '../student/StudentIdContext';
@@ -44,55 +45,84 @@ export function HoldPage() {
   const status = expired ? 'EXPIRED' : hold?.status;
 
   return (
-    <div className="page">
-      <Link to="/">{labels.backToClasses}</Link>
+    <Stack gap="lg">
+      <Anchor component={Link} to="/" size="sm">
+        ← {labels.backToClasses}
+      </Anchor>
 
-      {holdQuery.isLoading ? <p className="hint">{labels.loading}</p> : null}
-      {holdQuery.isError ? <p className="error">{errorMessage((holdQuery.error as ApiError).code)}</p> : null}
+      {holdQuery.isLoading ? <Text c="dimmed">{labels.loading}</Text> : null}
+
+      {holdQuery.isError ? (
+        <Alert color="red" variant="light">
+          {errorMessage((holdQuery.error as ApiError).code)}
+        </Alert>
+      ) : null}
 
       {hold ? (
-        <section className="card">
-          <h2>{className ?? `${labels.classNameLabel} ${hold.classId}`}</h2>
+        <Card withBorder radius="md" padding="lg" shadow="sm">
+          <Group justify="space-between" align="flex-start" wrap="nowrap">
+            <Title order={3}>{className ?? `${labels.classNameLabel} ${hold.classId}`}</Title>
+            <StatusBadge status={hold.status} expiresAt={hold.expiresAt} />
+          </Group>
 
-          <div className="hold-stats">
-            <div>
-              <span className="label">{labels.status}</span>
-              <StatusChip status={hold.status} expiresAt={hold.expiresAt} />
+          {status === 'HELD' ? (
+            <div style={{ marginTop: '1.25rem' }}>
+              <Text size="xs" c="dimmed">
+                {labels.timeLeft}
+              </Text>
+              <Text fz={44} fw={800} lh={1.1} className="mono" c="indigo.7">
+                {formatRemaining(remaining)}
+              </Text>
             </div>
+          ) : null}
 
-            {status === 'HELD' ? (
-              <div>
-                <span className="label">{labels.timeLeft}</span>
-                <b className="countdown">{formatRemaining(remaining)}</b>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="actions">
-            <button
-              type="button"
-              disabled={!isValid || status !== 'HELD' || confirm.isPending}
+          <Group gap="sm" mt="lg">
+            <Button
+              disabled={!isValid || status !== 'HELD'}
+              loading={confirm.isPending}
               onClick={() => confirm.mutate()}
             >
               {labels.pay}
-            </button>
-            <button
-              type="button"
-              disabled={!isValid || status !== 'HELD' || cancel.isPending}
+            </Button>
+            <Button
+              variant="light"
+              color="red"
+              disabled={!isValid || status !== 'HELD'}
+              loading={cancel.isPending}
               onClick={() => cancel.mutate()}
             >
               {labels.cancel}
-            </button>
-          </div>
+            </Button>
+          </Group>
 
-          {status === 'CONFIRMED' ? <p className="ok">আপনার ভর্তি নিশ্চিত হয়েছে</p> : null}
-          {status === 'EXPIRED' ? <p className="hint">আসনটি ছেড়ে দেওয়া হয়েছে</p> : null}
-          {status === 'CANCELLED' ? <p className="hint">আবেদনটি বাতিল করা হয়েছে</p> : null}
+          {status === 'CONFIRMED' ? (
+            <Alert color="teal" variant="light" mt="lg">
+              আপনার ভর্তি নিশ্চিত হয়েছে
+            </Alert>
+          ) : null}
+          {status === 'EXPIRED' ? (
+            <Alert color="gray" variant="light" mt="lg">
+              আসনটি ছেড়ে দেওয়া হয়েছে
+            </Alert>
+          ) : null}
+          {status === 'CANCELLED' ? (
+            <Alert color="red" variant="light" mt="lg">
+              আবেদনটি বাতিল করা হয়েছে
+            </Alert>
+          ) : null}
 
-          {confirm.isError ? <p className="error">{errorMessage((confirm.error as ApiError).code)}</p> : null}
-          {cancel.isError ? <p className="error">{errorMessage((cancel.error as ApiError).code)}</p> : null}
-        </section>
+          {confirm.isError ? (
+            <Alert color="red" variant="light" mt="md">
+              {errorMessage((confirm.error as ApiError).code)}
+            </Alert>
+          ) : null}
+          {cancel.isError ? (
+            <Alert color="red" variant="light" mt="md">
+              {errorMessage((cancel.error as ApiError).code)}
+            </Alert>
+          ) : null}
+        </Card>
       ) : null}
-    </div>
+    </Stack>
   );
 }

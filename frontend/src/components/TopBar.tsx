@@ -1,3 +1,4 @@
+import { Anchor, Group, TextInput, ThemeIcon, Title } from '@mantine/core';
 import { NavLink } from 'react-router-dom';
 import { labels } from '../strings';
 import { useStudentId } from '../student/StudentIdContext';
@@ -6,31 +7,35 @@ export function TopBar() {
   const { studentId, setStudentId, isValid } = useStudentId();
 
   return (
-    <header className="topbar">
-      <div className="brand">
-        <span className="mark" aria-hidden="true">
+    <Group h="100%" px="lg" justify="space-between" wrap="nowrap" gap="lg">
+      <Group gap="sm" wrap="nowrap">
+        <ThemeIcon size={38} radius="md" variant="gradient" gradient={{ from: 'indigo', to: 'blue' }}>
           ভ
-        </span>
-        <h1>{labels.title}</h1>
-      </div>
+        </ThemeIcon>
+        <Title order={5}>{labels.title}</Title>
+      </Group>
 
-      <div className="student-id">
-        <label htmlFor="student-id">{labels.studentId}</label>
-        <input
-          id="student-id"
-          value={studentId}
-          inputMode="numeric"
-          placeholder={labels.studentIdPlaceholder}
-          onChange={(event) => setStudentId(event.target.value)}
-          aria-invalid={!isValid && studentId.length > 0}
-        />
-        {!isValid && studentId.length > 0 ? <small className="hint">{labels.studentIdHint}</small> : null}
-      </div>
+      <TextInput
+        aria-label={labels.studentId}
+        label={labels.studentId}
+        description={!isValid && studentId.length > 0 ? labels.studentIdHint : undefined}
+        error={!isValid && studentId.length > 0}
+        value={studentId}
+        inputMode="numeric"
+        placeholder={labels.studentIdPlaceholder}
+        onChange={(event) => setStudentId(event.currentTarget.value)}
+        w={280}
+        size="xs"
+      />
 
-      <nav>
-        <NavLink to="/">{labels.navClasses}</NavLink>
-        <NavLink to="/me">{labels.navMyHolds}</NavLink>
-      </nav>
-    </header>
+      <Group gap={4} wrap="nowrap">
+        <Anchor component={NavLink} to="/" size="sm" fw={600}>
+          {labels.navClasses}
+        </Anchor>
+        <Anchor component={NavLink} to="/me" size="sm" fw={600}>
+          {labels.navMyHolds}
+        </Anchor>
+      </Group>
+    </Group>
   );
 }
