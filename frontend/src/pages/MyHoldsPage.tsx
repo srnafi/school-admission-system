@@ -1,4 +1,4 @@
-import { Alert, Anchor, Card, Table, Text, Title } from '@mantine/core';
+import { Alert, Anchor } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { ApiError, api } from '../api/client';
@@ -16,58 +16,63 @@ export function MyHoldsPage() {
     refetchInterval: 5000,
   });
 
+  const holds = holdsQuery.data ?? [];
+
   return (
-    <Card withBorder radius="md" padding="lg">
-      <Title order={4} mb="md">
-        {labels.myHoldsTitle}
-      </Title>
+    <div className="panel">
+      <div className="panel-head">
+        <h1 className="page-title">{labels.myHoldsTitle}</h1>
+        <span className="panel-note">{holds.length ? `${holds.length}টি আবেদন` : labels.noHolds}</span>
+      </div>
 
       {!isValid ? (
-        <Alert color="blue" variant="light">
+        <Alert color="blue" variant="light" radius={0}>
           {labels.needStudentId}
         </Alert>
       ) : null}
 
       {holdsQuery.isError ? (
-        <Alert color="red" variant="light">
+        <Alert color="red" variant="light" radius={0}>
           {errorMessage((holdsQuery.error as ApiError).code)}
         </Alert>
       ) : null}
 
-      {holdsQuery.isLoading ? <Text c="dimmed">{labels.loading}</Text> : null}
+      {holdsQuery.isLoading ? <div className="empty">{labels.loading}</div> : null}
 
-      {holdsQuery.data?.length === 0 ? <Text c="dimmed">{labels.noHolds}</Text> : null}
+      {!holdsQuery.isLoading && isValid && holds.length === 0 ? <div className="empty">{labels.noHolds}</div> : null}
 
-      {holdsQuery.data && holdsQuery.data.length > 0 ? (
-        <Table striped highlightOnHover withTableBorder>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>{labels.classNameLabel}</Table.Th>
-              <Table.Th>{labels.status}</Table.Th>
-              <Table.Th>{labels.navMyHolds}</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {holdsQuery.data.map((item) => (
-              <Table.Tr key={item.holdId}>
-                <Table.Td>
-                  <Anchor component={Link} to={`/holds/${item.holdId}`} fw={600}>
+      {holds.length > 0 ? (
+        <table className="grid-table">
+          <thead>
+            <tr>
+              <th>{labels.classNameLabel}</th>
+              <th>{labels.status}</th>
+              <th className="col-optional">{labels.holdId}</th>
+              <th className="col-optional">{labels.expiresAt}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {holds.map((item) => (
+              <tr key={item.holdId}>
+                <td>
+                  <Anchor component={Link} to={`/holds/${item.holdId}`} fw={600} size="sm" c="inherit">
                     {item.className}
                   </Anchor>
-                </Table.Td>
-                <Table.Td>
+                </td>
+                <td>
                   <StatusBadge status={item.status} expiresAt={item.expiresAt} />
-                </Table.Td>
-                <Table.Td>
-                  <Text size="xs" c="dimmed" className="mono">
-                    {item.holdId}
-                  </Text>
-                </Table.Td>
-              </Table.Tr>
+                </td>
+                <td className="col-optional">
+                  <span className="cell-id">{item.holdId}</span>
+                </td>
+                <td className="col-optional num">
+                  {new Date(item.expiresAt).toLocaleString('bn-BD')}
+                </td>
+              </tr>
             ))}
-          </Table.Tbody>
-        </Table>
+          </tbody>
+        </table>
       ) : null}
-    </Card>
+    </div>
   );
 }

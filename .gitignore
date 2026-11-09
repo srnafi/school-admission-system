@@ -24,3 +24,8 @@ Thumbs.db
 
 # The assignment brief stays out of the repository
 *.pdf
+
+# Local design tooling artifacts
+.impeccable/
+PRODUCT.md
+DESIGN.md

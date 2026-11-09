@@ -28,6 +28,9 @@ export const labels = {
   needStudentId: 'শুরু করতে উপরে আপনার জন্ম নিবন্ধন নম্বর দিন',
   loading: 'লোড হচ্ছে…',
   classNameLabel: 'ক্লাস',
+  details: 'বিস্তারিত',
+  holdId: 'আবেদন নম্বর',
+  expiresAt: 'শেষ সময়',
   crashed: 'কিছু একটা সমস্যা হয়েছে, আবার চেষ্টা করুন',
   reload: 'পাতা আবার লোড করুন',
 } as const;

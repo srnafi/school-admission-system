@@ -1,6 +1,7 @@
-import { AppShell, Container } from '@mantine/core';
+import { AppShell } from '@mantine/core';
 import { Route, Routes } from 'react-router-dom';
-import { TopBar } from './components/TopBar';
+import { ShellHeader } from './components/ShellHeader';
+import { NavRail } from './components/NavRail';
 import { ClassesPage } from './pages/ClassesPage';
 import { HoldPage } from './pages/HoldPage';
 import { MyHoldsPage } from './pages/MyHoldsPage';
@@ -9,20 +10,30 @@ import { StudentIdProvider } from './student/StudentIdContext';
 export default function App() {
   return (
     <StudentIdProvider>
-      <AppShell header={{ height: 70 }} padding="lg">
-        <AppShell.Header>
-          <TopBar />
+      <AppShell
+        header={{ height: 56 }}
+        navbar={{ width: 232, breakpoint: 'sm', collapsed: { mobile: true } }}
+        padding={0}
+      >
+        <AppShell.Header className="shell-header">
+          <ShellHeader />
         </AppShell.Header>
 
+        <AppShell.Navbar className="shell-rail">
+          <NavRail />
+        </AppShell.Navbar>
+
         <AppShell.Main>
-          <Container size="lg">
-            <Routes>
-              <Route path="/" element={<ClassesPage />} />
-              <Route path="/holds/:holdId" element={<HoldPage />} />
-              <Route path="/me" element={<MyHoldsPage />} />
-              <Route path="*" element={<p>এই পাতা নেই</p>} />
-            </Routes>
-          </Container>
+          <div className="shell-main">
+            <div className="content">
+              <Routes>
+                <Route path="/" element={<ClassesPage />} />
+                <Route path="/holds/:holdId" element={<HoldPage />} />
+                <Route path="/me" element={<MyHoldsPage />} />
+                <Route path="*" element={<p>এই পাতা নেই</p>} />
+              </Routes>
+            </div>
+          </div>
         </AppShell.Main>
       </AppShell>
     </StudentIdProvider>
