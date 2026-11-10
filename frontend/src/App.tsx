@@ -10,32 +10,32 @@ import { StudentIdProvider } from './student/StudentIdContext';
 export default function App() {
   return (
     <StudentIdProvider>
-      <AppShell
-        header={{ height: 56 }}
-        navbar={{ width: 232, breakpoint: 'sm', collapsed: { mobile: true } }}
-        padding={0}
-      >
+      <AppShell header={{ height: 70 }} padding={0}>
         <AppShell.Header className="shell-header">
           <ShellHeader />
         </AppShell.Header>
 
-        <AppShell.Navbar className="shell-rail">
-          <NavRail />
-        </AppShell.Navbar>
-
         <AppShell.Main>
           <div className="shell-main">
-            <nav className="mobile-nav">
+            <nav className="mobile-nav" aria-label="মোবাইল মেনু">
               <NavRail />
             </nav>
-            <div className="content">
+            <main className="content">
               <Routes>
                 <Route path="/" element={<ClassesPage />} />
                 <Route path="/holds/:holdId" element={<HoldPage />} />
                 <Route path="/me" element={<MyHoldsPage />} />
-                <Route path="*" element={<p>এই পাতা নেই</p>} />
+                <Route
+                  path="*"
+                  element={
+                    <div className="empty-classes-state">
+                      <h3>এই পাতা নেই</h3>
+                      <p>অনুরোধকৃত পাতাটি খুঁজে পাওয়া যায়নি।</p>
+                    </div>
+                  }
+                />
               </Routes>
-            </div>
+            </main>
           </div>
         </AppShell.Main>
       </AppShell>

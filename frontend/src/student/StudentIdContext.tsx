@@ -1,22 +1,18 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { sanitizeStudentId, isValidStudentId } from './studentIdUtils';
+
+export { sanitizeStudentId, isValidStudentId } from './studentIdUtils';
 
 const STORAGE_KEY = 'school-admission.studentId';
 
-interface StudentIdValue {
+export interface StudentIdValue {
   studentId: string;
   setStudentId: (value: string) => void;
+  clearStudentId: () => void;
   isValid: boolean;
 }
 
 const StudentIdContext = createContext<StudentIdValue | null>(null);
-
-export function sanitizeStudentId(value: string): string {
-  return value.replace(/\D/g, '').slice(0, 17);
-}
-
-export function isValidStudentId(value: string): boolean {
-  return /^\d{17}$/.test(value);
-}
 
 export function StudentIdProvider({ children }: { children: ReactNode }) {
   const [studentId, setId] = useState(() => sanitizeStudentId(localStorage.getItem(STORAGE_KEY) ?? ''));
@@ -27,9 +23,19 @@ export function StudentIdProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEY, next);
   }, []);
 
+  const clearStudentId = useCallback(() => {
+    setId('');
+    localStorage.removeItem(STORAGE_KEY);
+  }, []);
+
   const value = useMemo(
-    () => ({ studentId, setStudentId, isValid: isValidStudentId(studentId) }),
-    [studentId, setStudentId],
+    () => ({
+      studentId,
+      setStudentId,
+      clearStudentId,
+      isValid: isValidStudentId(studentId),
+    }),
+    [studentId, setStudentId, clearStudentId],
   );
 
   return <StudentIdContext.Provider value={value}>{children}</StudentIdContext.Provider>;
