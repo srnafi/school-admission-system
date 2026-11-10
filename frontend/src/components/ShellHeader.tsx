@@ -38,7 +38,7 @@ export function ShellHeader() {
   const classesQuery = useQuery({
     queryKey: ['classes'],
     queryFn: api.listClasses,
-    refetchInterval: 5000,
+    refetchInterval: 3000,
   });
 
   const classCount = classesQuery.data?.length;

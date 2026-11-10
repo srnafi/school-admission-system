@@ -42,14 +42,13 @@ export function HoldPage() {
   const hold = holdQuery.data;
   const remaining = useCountdown(hold?.expiresAt);
 
-  const holdsQuery = useQuery({
-    queryKey: ['myHolds', studentId],
-    queryFn: () => api.myHolds(studentId),
-    enabled: isValid,
+  const classesQuery = useQuery({
+    queryKey: ['classes'],
+    queryFn: () => api.listClasses(),
   });
 
   const resolvedName =
-    className ?? holdsQuery.data?.find((item) => item.holdId === holdId)?.className;
+    className ?? classesQuery.data?.find((item) => item.id === hold?.classId)?.name;
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['hold', holdId] });

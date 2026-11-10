@@ -430,6 +430,7 @@ export function ClassesPage() {
                       </td>
 
                       <td className="cell-free">
+                        <span className="free-label">{labels.seatsAvailable}</span>
                         <span className={`free-figure${isFull ? ' is-zero' : ''}`}>
                           {item.availableSeats}
                           <span className="free-unit">{labels.unit}</span>
