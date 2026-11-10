@@ -1,21 +1,25 @@
 import { useState } from 'react';
-import { Alert, Anchor, Button, Group } from '@mantine/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { ApiError, api } from '../api/client';
-import { StatusBadge } from '../components/StatusBadge';
-import { formatRemaining, useCountdown } from '../hooks/useCountdown';
-import { labels, errorMessage } from '../strings';
-import { useStudentId } from '../student/StudentIdContext';
+import { StatusStamp } from '../components/StatusStamp';
 import {
-  ArrowLeftIcon,
-  ClockIcon,
-  CheckCircleIcon,
   AlertCircleIcon,
-  PrinterIcon,
-  CopyIcon,
+  ArrowLeftIcon,
+  CheckCircleIcon,
   CheckIcon,
+  ClockIcon,
+  CopyIcon,
+  PrinterIcon,
 } from '../components/icons';
+import { formatRemaining, useCountdown } from '../hooks/useCountdown';
+import { errorMessage, labels, statusNotes, toBengaliDigits } from '../strings';
+import { useStudentId } from '../student/StudentIdContext';
+import { formatDateTime } from '../utils/datetime';
+
+const TICK_COUNT = 10;
+
+type Urgency = 'calm' | 'warning' | 'urgent';
 
 export function HoldPage() {
   const { holdId = '' } = useParams();
@@ -25,7 +29,7 @@ export function HoldPage() {
   const { studentId, isValid } = useStudentId();
   const queryClient = useQueryClient();
 
-  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const holdQuery = useQuery({
@@ -37,6 +41,15 @@ export function HoldPage() {
 
   const hold = holdQuery.data;
   const remaining = useCountdown(hold?.expiresAt);
+
+  const holdsQuery = useQuery({
+    queryKey: ['myHolds', studentId],
+    queryFn: () => api.myHolds(studentId),
+    enabled: isValid,
+  });
+
+  const resolvedName =
+    className ?? holdsQuery.data?.find((item) => item.holdId === holdId)?.className;
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['hold', holdId] });
@@ -52,7 +65,7 @@ export function HoldPage() {
   const cancel = useMutation({
     mutationFn: () => api.cancelHold(holdId, studentId),
     onSuccess: async () => {
-      setConfirmCancelOpen(false);
+      setCancelOpen(false);
       await refresh();
     },
   });
@@ -60,244 +73,294 @@ export function HoldPage() {
   const expired = hold?.status === 'HELD' && remaining <= 0;
   const status = expired ? 'EXPIRED' : hold?.status;
 
-  const copyHoldId = () => {
-    if (hold?.holdId) {
-      navigator.clipboard.writeText(hold.holdId);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  let urgencyLevel: 'calm' | 'warning' | 'urgent' | 'expired' = 'calm';
-  if (status === 'EXPIRED') {
-    urgencyLevel = 'expired';
-  } else if (remaining <= 30_000) {
-    urgencyLevel = 'urgent';
+  let urgency: Urgency = 'calm';
+  if (remaining <= 30_000) {
+    urgency = 'urgent';
   } else if (remaining <= 60_000) {
-    urgencyLevel = 'warning';
+    urgency = 'warning';
   }
 
+  const minutesLeft = Math.min(TICK_COUNT, Math.ceil(remaining / 60_000));
+
+  const copyHoldId = () => {
+    if (!hold) {
+      return;
+    }
+
+    void navigator.clipboard?.writeText(hold.holdId);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  };
+
+  const urgencyCopy = {
+    calm: {
+      label: 'আসন সংরক্ষিত',
+      note: 'এই আসনটি সাময়িকভাবে আপনার নামে রাখা আছে। সময় শেষ হলে আসনটি আবার খালি হয়ে যাবে।',
+    },
+    warning: {
+      label: 'সময় ফুরিয়ে আসছে',
+      note: 'আর এক মিনিটেরও কম সময় বাকি। এখনই ভর্তি ফি দিন, নইলে আসনটি ছেড়ে যাবে।',
+    },
+    urgent: {
+      label: 'শেষ সময়',
+      note: 'সময় প্রায় শেষ। ফি না দিলে আসনটি স্বয়ংক্রিয়ভাবে বাতিল হয়ে যাবে।',
+    },
+  }[urgency];
+
   return (
-    <div className="desk-container hold-desk-container">
-      {/* Back navigation bar */}
-      <div className="hold-nav-bar">
-        <Anchor component={Link} to="/" className="clean-back-link">
+    <div className="page">
+      <div className="hold-bar">
+        <Link to="/" className="link-quiet">
           <ArrowLeftIcon />
-          <span>{labels.backToClasses}</span>
-        </Anchor>
+          {labels.backToClasses}
+        </Link>
         {hold && (
-          <button
-            type="button"
-            className="clean-print-btn"
-            onClick={() => window.print()}
-            title="ভাউচার প্রিন্ট করুন"
-          >
-            <PrinterIcon /> প্রিন্ট কপি
+          <button type="button" className="btn btn-quiet btn-sm" onClick={() => window.print()}>
+            <PrinterIcon />
+            {labels.printVoucher}
           </button>
         )}
       </div>
 
       {holdQuery.isLoading && (
-        <div className="empty-loading-state">
-          <div className="custom-loader-ring" />
-          <p>{labels.loading}</p>
-        </div>
+        <section className="sheet">
+          <div className="skeleton">
+            {[0, 1, 2].map((row) => (
+              <div key={row} className="skeleton-row">
+                <span className="skeleton-bar is-name" />
+                <span className="skeleton-bar is-seats" />
+                <span className="skeleton-bar is-figure" />
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {holdQuery.isError && (
-        <Alert color="red" variant="light" icon={<AlertCircleIcon />}>
-          {errorMessage((holdQuery.error as ApiError).code)}
-        </Alert>
+        <section className="sheet">
+          <div className="notice is-error">
+            <AlertCircleIcon className="notice-icon" />
+            <span>{errorMessage((holdQuery.error as ApiError).code)}</span>
+            <button type="button" className="btn btn-quiet btn-sm" onClick={() => holdQuery.refetch()}>
+              {labels.retry}
+            </button>
+          </div>
+        </section>
       )}
 
       {hold && (
-        <div className="hold-split-grid">
-          {/* Main Action Terminal Panel */}
-          <div className="panel hold-action-panel">
-            <div className="panel-head">
-              <div>
-                <h1 className="desk-title">
-                  {className ?? `${labels.classNameLabel} #${hold.classId}`}
-                </h1>
-                <span className="desk-subtitle">সাময়িক আসন সংরক্ষণ ও ভর্তি নিশ্চিতকরণ</span>
+        <div className="hold-grid">
+          <section className="sheet hold-main" aria-labelledby="hold-title">
+            <div className="sheet-head">
+              <div className="hold-class">
+                <h1 id="hold-title">{resolvedName ?? `${labels.classNameLabel} #${hold.classId}`}</h1>
+                <span>সাময়িক আসন সংরক্ষণ ও ভর্তি নিশ্চিতকরণ</span>
               </div>
-              <StatusBadge status={hold.status} expiresAt={hold.expiresAt} />
+              <StatusStamp status={hold.status} expiresAt={hold.expiresAt} size="lg" />
             </div>
 
-            <div className="hold-action-body">
-              {/* Clean Countdown Card */}
-              {status === 'HELD' && (
-                <div className={`clean-timer-box urgency-${urgencyLevel}`}>
-                  <div className="timer-label-row">
-                    <span className="timer-field-label">
-                      <ClockIcon /> {labels.timeLeft}
-                    </span>
-                    <span className="timer-state-text">
-                      {urgencyLevel === 'urgent'
-                        ? 'জরুরি সময়'
-                        : urgencyLevel === 'warning'
-                          ? 'সময়সীমা ঘনিয়ে আসছে'
-                          : 'আসন সংরক্ষিত'}
-                    </span>
-                  </div>
+            <div className="rule-heavy" />
 
-                  <div className="timer-digits num">{formatRemaining(remaining)}</div>
+            {status === 'HELD' && (
+              <div className={`deadline is-${urgency}`}>
+                <div className="deadline-head">
+                  <span className="deadline-label">
+                    <ClockIcon />
+                    {labels.timeLeft}
+                  </span>
+                  <span className="deadline-state">{urgencyCopy.label}</span>
+                </div>
 
-                  <p className="timer-note">
-                    {urgencyLevel === 'urgent'
-                      ? 'সময় প্রায় শেষ! আসনটি স্বয়ংক্রিয়ভাবে বাতিল হওয়ার আগেই ভর্তি ফি পরিশোধ করুন।'
-                      : 'নির্ধারিত সময়ের মধ্যে ভর্তি ফি নিশ্চিত করে আসনটি চূড়ান্ত করুন।'}
+                <div className="deadline-digits">{formatRemaining(remaining)}</div>
+
+                <div className="deadline-ticks" aria-hidden="true">
+                  {Array.from({ length: TICK_COUNT }, (_, index) => (
+                    <i key={index} className={index < minutesLeft ? 'is-full' : undefined} />
+                  ))}
+                </div>
+
+                <div className="deadline-scale" aria-hidden="true">
+                  <span>{toBengaliDigits(TICK_COUNT)} মিনিট</span>
+                  <span>০</span>
+                </div>
+
+                <p className="deadline-note">{urgencyCopy.note}</p>
+              </div>
+            )}
+
+            {status === 'CONFIRMED' && (
+              <div className="outcome is-confirmed">
+                <CheckCircleIcon className="outcome-icon" />
+                <div>
+                  <strong>আপনার ভর্তি নিশ্চিত হয়েছে</strong>
+                  <p>ডানের ভাউচারটি সংরক্ষণ বা প্রিন্ট করে রাখুন। শ্রেণিতে যোগ দেওয়ার সময় এটি দেখাতে হবে।</p>
+                </div>
+              </div>
+            )}
+
+            {status === 'EXPIRED' && (
+              <div className="outcome is-expired">
+                <AlertCircleIcon className="outcome-icon" />
+                <div>
+                  <strong>আসনটি ছেড়ে দেওয়া হয়েছে</strong>
+                  <p>নির্ধারিত সময়ে ফি দেওয়া হয়নি। ক্লাস তালিকা থেকে আবার আবেদন করা যাবে, যদি আসন খালি থাকে।</p>
+                </div>
+              </div>
+            )}
+
+            {status === 'CANCELLED' && (
+              <div className="outcome is-cancelled">
+                <AlertCircleIcon className="outcome-icon" />
+                <div>
+                  <strong>আবেদনটি বাতিল করা হয়েছে</strong>
+                  <p>আপনি এই আসনটির দাবি প্রত্যাহার করেছেন। আসনটি আবার সাধারণ তালিকায় খালি দেখাচ্ছে।</p>
+                </div>
+              </div>
+            )}
+
+            <div className="hold-actions">
+              {cancelOpen ? (
+                <div className="cancel-confirm">
+                  <p>
+                    <AlertCircleIcon />
+                    আপনি কি এই সংরক্ষিত আসনটি ছেড়ে দিতে চান? এটি আর ফেরত পাওয়া যাবে না।
                   </p>
-                </div>
-              )}
-
-              {/* Status Outcome Banners */}
-              {status === 'CONFIRMED' && (
-                <div className="outcome-banner banner-confirmed">
-                  <CheckCircleIcon className="outcome-icon" />
-                  <div className="outcome-text">
-                    <strong>আপনার ভর্তি নিশ্চিত হয়েছে</strong>
-                    <span>অনলাইন সাময়িক ভর্তি সফলভাবে সম্পন্ন হয়েছে। ডানের ভাউচারটি সংরক্ষণ করুন।</span>
-                  </div>
-                </div>
-              )}
-
-              {status === 'EXPIRED' && (
-                <div className="outcome-banner banner-expired">
-                  <AlertCircleIcon className="outcome-icon" />
-                  <div className="outcome-text">
-                    <strong>আসনটি ছেড়ে দেওয়া হয়েছে</strong>
-                    <span>নির্ধারিত সময়ে ফি প্রদান না করায় আবেদনটির মেয়াদ শেষ হয়েছে। পুনরায় আবেদন করতে ক্লাস তালিকায় ফিরে যান।</span>
-                  </div>
-                </div>
-              )}
-
-              {status === 'CANCELLED' && (
-                <div className="outcome-banner banner-cancelled">
-                  <AlertCircleIcon className="outcome-icon" />
-                  <div className="outcome-text">
-                    <strong>আবেদনটি বাতিল করা হয়েছে</strong>
-                    <span>আপনি এই আসনটির দাবি প্রত্যাহার করেছেন। এটি পুনরায় সাধারণ তালিকায় উন্মুক্ত করা হয়েছে।</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="hold-buttons-block">
-                {!confirmCancelOpen ? (
-                  <Group gap="sm">
-                    <Button
-                      size="md"
-                      color="blue"
-                      disabled={!isValid || status !== 'HELD'}
-                      loading={confirm.isPending}
-                      onClick={() => confirm.mutate()}
-                      className="btn-pay-desk"
+                  <div className="cancel-actions">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-danger-solid"
+                      disabled={cancel.isPending}
+                      onClick={() => cancel.mutate()}
                     >
-                      {labels.pay}
-                    </Button>
-
-                    {status === 'HELD' && (
-                      <Button
-                        size="md"
-                        variant="subtle"
-                        color="red"
-                        disabled={!isValid || status !== 'HELD'}
-                        onClick={() => setConfirmCancelOpen(true)}
-                        className="btn-cancel-desk"
-                      >
-                        {labels.cancel}
-                      </Button>
-                    )}
-                  </Group>
-                ) : (
-                  <div className="cancel-confirm-box">
-                    <div className="cancel-confirm-text">
-                      <AlertCircleIcon />
-                      <span>আপনি কি নিশ্চিতভাবে এই সংরক্ষিত আসনটি ছেড়ে দিতে চান?</span>
-                    </div>
-                    <Group gap="xs" style={{ marginTop: '0.4rem' }}>
-                      <Button
-                        size="xs"
-                        color="red"
-                        variant="filled"
-                        loading={cancel.isPending}
-                        onClick={() => cancel.mutate()}
-                      >
-                        হ্যাঁ, বাতিল নিশ্চিত করুন
-                      </Button>
-                      <Button
-                        size="xs"
-                        variant="default"
-                        disabled={cancel.isPending}
-                        onClick={() => setConfirmCancelOpen(false)}
-                      >
-                        না, ফিরে যান
-                      </Button>
-                    </Group>
+                      {cancel.isPending ? 'বাতিল হচ্ছে…' : 'হ্যাঁ, বাতিল করুন'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-quiet btn-sm"
+                      disabled={cancel.isPending}
+                      onClick={() => setCancelOpen(false)}
+                    >
+                      না, ফিরে যান
+                    </button>
                   </div>
-                )}
-              </div>
-
-              {confirm.isError && (
-                <Alert color="red" variant="light" icon={<AlertCircleIcon />}>
-                  {errorMessage((confirm.error as ApiError).code)}
-                </Alert>
-              )}
-
-              {cancel.isError && (
-                <Alert color="red" variant="light" icon={<AlertCircleIcon />}>
-                  {errorMessage((cancel.error as ApiError).code)}
-                </Alert>
-              )}
-            </div>
-          </div>
-
-          {/* Official Voucher / Receipt Panel */}
-          <div className="panel voucher-panel" id="admission-voucher">
-            <div className="panel-head">
-              <h2 className="desk-title">{labels.details}</h2>
-              <span className="voucher-seal">অফিসিয়াল কপি</span>
-            </div>
-
-            <ul className="clean-receipt-list">
-              <li>
-                <span className="receipt-label">{labels.holdId}</span>
-                <div className="receipt-val-group">
-                  <b className="num">#{hold.holdId}</b>
-                  <button
-                    type="button"
-                    className="receipt-copy-btn"
-                    onClick={copyHoldId}
-                    title="কপি করুন"
-                  >
-                    {copied ? <CheckIcon /> : <CopyIcon />}
-                  </button>
                 </div>
-              </li>
-              <li>
-                <span className="receipt-label">{labels.classNameLabel}</span>
-                <b>{className ?? hold.classId}</b>
-              </li>
-              <li>
-                <span className="receipt-label">শিক্ষার্থীর জন্ম নিবন্ধন</span>
-                <b className="num">{hold.studentId}</b>
-              </li>
-              <li>
-                <span className="receipt-label">{labels.expiresAt}</span>
-                <b className="num">
-                  {new Date(hold.expiresAt).toLocaleString('bn-BD', {
-                    dateStyle: 'medium',
-                    timeStyle: 'medium',
-                  })}
-                </b>
-              </li>
-            </ul>
+              ) : (
+                <>
+                  {status !== 'CONFIRMED' && status !== 'CANCELLED' && (
+                    <button
+                      type="button"
+                      className={`btn ${status === 'HELD' ? 'btn-primary' : 'btn-quiet'}`}
+                      disabled={!isValid || status !== 'HELD'}
+                      onClick={() => confirm.mutate()}
+                    >
+                      {confirm.isPending ? (
+                        <>
+                          <span className="btn-spinner" />
+                          {labels.applying}
+                        </>
+                      ) : (
+                        labels.pay
+                      )}
+                    </button>
+                  )}
 
-            <div className="voucher-note">
-              <span>বাংলাদেশ শিক্ষা বোর্ড ডিজিটাল ডাটাবেজ দ্বারা সংরক্ষিত।</span>
+                  {status === 'HELD' && (
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      disabled={!isValid}
+                      onClick={() => setCancelOpen(true)}
+                    >
+                      {labels.cancel}
+                    </button>
+                  )}
+
+                  {status === 'EXPIRED' && (
+                    <Link to="/" className="btn btn-quiet">
+                      আবার আবেদন করুন
+                    </Link>
+                  )}
+
+                  {(status === 'CONFIRMED' || status === 'CANCELLED') && (
+                    <Link to="/" className="btn btn-primary">
+                      {labels.backToClasses}
+                    </Link>
+                  )}
+
+                  <p className="hold-actions-note">
+                    {status === 'HELD'
+                      ? isValid
+                        ? 'ফি দিলে আসনটি নিশ্চিত হবে। বাতিল করলে আসনটি আবার খালি হবে।'
+                        : 'ফি দিতে উপরে জন্ম নিবন্ধন নম্বরটি দিন।'
+                      : null}
+                  </p>
+                </>
+              )}
             </div>
-          </div>
+
+            {confirm.isError && (
+              <div className="notice is-error">
+                <AlertCircleIcon className="notice-icon" />
+                <span>{errorMessage((confirm.error as ApiError).code)}</span>
+              </div>
+            )}
+
+            {cancel.isError && (
+              <div className="notice is-error">
+                <AlertCircleIcon className="notice-icon" />
+                <span>{errorMessage((cancel.error as ApiError).code)}</span>
+              </div>
+            )}
+          </section>
+
+          <aside className="sheet voucher" aria-labelledby="voucher-title">
+            <div className="voucher-head">
+              <div>
+                <p className="voucher-kicker">অফিসিয়াল কপি</p>
+                <h2 className="voucher-title" id="voucher-title">
+                  সাময়িক ভর্তি ভাউচার
+                </h2>
+              </div>
+            </div>
+
+            <div className="voucher-serial">
+              <span>{labels.holdId}</span>
+              <b>#{hold.holdId}</b>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={copyHoldId}
+                title="আবেদন নম্বর কপি করুন"
+                aria-label="আবেদন নম্বর কপি করুন"
+              >
+                {copied ? <CheckIcon /> : <CopyIcon />}
+              </button>
+            </div>
+
+            <dl className="voucher-rows">
+              <div className="voucher-row">
+                <dt>{labels.classNameLabel}</dt>
+                <dd>{resolvedName ?? hold.classId}</dd>
+              </div>
+              <div className="voucher-row">
+                <dt>শিক্ষার্থীর জন্ম নিবন্ধন</dt>
+                <dd className="mono">{hold.studentId}</dd>
+              </div>
+              <div className="voucher-row">
+                <dt>{labels.expiresAt}</dt>
+                <dd>{formatDateTime(hold.expiresAt)}</dd>
+              </div>
+              <div className="voucher-row">
+                <dt>{labels.status}</dt>
+                <dd>{statusNotes[status ?? 'HELD']}</dd>
+              </div>
+            </dl>
+
+            <p className="voucher-foot">
+              ভর্তি ফি দেওয়ার পর এই ভাউচারটি সাময়িক ভর্তির প্রমাণ। শ্রেণিতে ভর্তি সম্পন্ন করতে প্রতিষ্ঠানের
+              অফিসে মূল কপি দেখান।
+            </p>
+          </aside>
         </div>
       )}
     </div>

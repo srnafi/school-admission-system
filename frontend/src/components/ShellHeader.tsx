@@ -1,19 +1,32 @@
-import { TextInput, Tooltip, ActionIcon } from '@mantine/core';
-import { NavLink } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { labels } from '../strings';
-import { useStudentId } from '../student/StudentIdContext';
 import { api } from '../api/client';
-import {
-  CheckIcon,
-  CloseIcon,
-  ShieldCheckIcon,
-  AcademicIcon,
-  FileTextIcon,
-} from './icons';
+import { labels, sessionLabel } from '../strings';
+import { useStudentId } from '../student/StudentIdContext';
+
+const ID_LENGTH = 17;
+
+function Crest() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M10 5.2c-1.3-.9-2.7-1.3-4.4-1.3v10.4c1.7 0 3.1.4 4.4 1.3 1.3-.9 2.7-1.3 4.4-1.3V3.9c-1.7 0-3.1.4-4.4 1.3Z" />
+      <path d="M10 5.2v10.4" />
+    </svg>
+  );
+}
 
 export function ShellHeader() {
-  const { studentId, setStudentId, clearStudentId, isValid } = useStudentId();
+  const { studentId, setStudentId, isValid } = useStudentId();
 
   const holdsQuery = useQuery({
     queryKey: ['myHolds', studentId],
@@ -22,144 +35,72 @@ export function ShellHeader() {
     refetchInterval: 5000,
   });
 
-  const activeHoldsCount =
-    holdsQuery.data?.filter((h) => h.status === 'HELD' || h.status === 'CONFIRMED').length ?? 0;
+  const classesQuery = useQuery({
+    queryKey: ['classes'],
+    queryFn: api.listClasses,
+    refetchInterval: 5000,
+  });
 
-  const count = studentId.length;
-  const isComplete = isValid;
-  const isIncomplete = count > 0 && !isComplete;
+  const classCount = classesQuery.data?.length;
+  const activeHolds =
+    holdsQuery.data?.filter((hold) => hold.status === 'HELD' || hold.status === 'CONFIRMED').length ?? 0;
+
+  const typed = studentId.length;
+  const state = isValid ? ' is-valid' : typed > 0 ? ' is-partial' : '';
 
   return (
-    <div className="header-inner">
-      {/* Brand Section */}
-      <div className="brand">
-        <NavLink to="/" className="brand-link">
-          <div className="brand-crest" aria-hidden="true">
-            <svg viewBox="0 0 32 32" fill="none" className="brand-crest-svg">
-              <path
-                d="M16 2L4 6.5V15C4 22.5 9.2 28.8 16 30C22.8 28.8 28 22.5 28 15V6.5L16 2Z"
-                fill="#1e3a8a"
-                stroke="#3b82f6"
-                strokeWidth="1.5"
-              />
-              <path d="M16 7L8 11.5L16 16L24 11.5L16 7Z" fill="#ffffff" />
-              <path
-                d="M11 13.5V18.5C11 18.5 12.8 20.5 16 20.5C19.2 20.5 21 18.5 21 18.5V13.5"
-                stroke="#ffffff"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
-          <div className="brand-text">
+    <header className="masthead">
+      <div className="masthead-inner">
+        <Link to="/" className="brand">
+          <span className="brand-mark">
+            <Crest />
+          </span>
+          <span className="brand-words">
             <span className="brand-name">{labels.title}</span>
-            <span className="brand-subtitle">অনলাইন ভর্তি ও আসন ট্র্যাকার</span>
-          </div>
-        </NavLink>
-      </div>
-
-      {/* Desktop Main Navigation Tabs */}
-      <nav className="desktop-nav-tabs" aria-label="মূল নেভিগেশন">
-        <NavLink
-          to="/"
-          end
-          className={({ isActive }) => `desktop-nav-tab${isActive ? ' is-active' : ''}`}
-        >
-          <span className="nav-tab-icon">
-            <AcademicIcon />
-          </span>
-          <span className="nav-tab-label">{labels.navClasses}</span>
-        </NavLink>
-
-        <NavLink
-          to="/me"
-          className={({ isActive }) => `desktop-nav-tab${isActive ? ' is-active' : ''}`}
-        >
-          <span className="nav-tab-icon">
-            <FileTextIcon />
-          </span>
-          <span className="nav-tab-label">{labels.navMyHolds}</span>
-          {activeHoldsCount > 0 && (
-            <span className="nav-tab-count" title="সক্রিয় আবেদন">
-              {activeHoldsCount}
+            <span className="brand-sub">
+              {labels.subtitle} · {sessionLabel()}
             </span>
-          )}
-        </NavLink>
-      </nav>
+          </span>
+        </Link>
 
-      {/* Identity & Status Right Section */}
-      <div className="header-right-tools">
-        <div className="identity-wrapper">
-          <Tooltip
-            label={
-              isComplete
-                ? '১৭ অঙ্কের জন্ম নিবন্ধন নম্বর যাচাইকৃত'
-                : isIncomplete
-                  ? `আরও ${17 - count}টি অঙ্ক বাকি রয়েছে (মোট ১৭ অঙ্ক)`
-                  : 'ভর্তির জন্য শিক্ষার্থীর ১৭ অঙ্কের অনলাইন জন্ম নিবন্ধন নম্বর আবশ্যক'
-            }
-            position="bottom-end"
-            withArrow
-            transitionProps={{ duration: 150 }}
-          >
-            <div className="identity-container">
-              <TextInput
-                id="student-id-input"
-                className={`identity-input${isComplete ? ' is-valid' : ''}${
-                  isIncomplete ? ' is-incomplete' : ''
-                }`}
-                aria-label={labels.studentId}
-                placeholder={`${labels.studentId} (${labels.studentIdPlaceholder})`}
-                value={studentId}
-                inputMode="numeric"
-                size="sm"
-                leftSection={
-                  isComplete ? (
-                    <ShieldCheckIcon className="identity-status-icon is-valid" />
-                  ) : (
-                    <span className="identity-status-label">BRN</span>
-                  )
-                }
-                rightSection={
-                  <div className="identity-actions">
-                    {count > 0 && (
-                      <ActionIcon
-                        size="xs"
-                        variant="subtle"
-                        color="gray"
-                        onClick={clearStudentId}
-                        title="মুছে ফেলুন"
-                        aria-label="নম্বর মুছুন"
-                      >
-                        <CloseIcon />
-                      </ActionIcon>
-                    )}
-                    {isComplete ? (
-                      <span className="identity-badge is-valid" title="যাচাইকৃত">
-                        <CheckIcon /> ১৭
-                      </span>
-                    ) : (
-                      <span
-                        className={`identity-badge${isIncomplete ? ' is-warning' : ''}`}
-                        title={`${count} / 17`}
-                      >
-                        {count}/17
-                      </span>
-                    )}
-                  </div>
-                }
-                rightSectionWidth={count > 0 ? 82 : 56}
-                onChange={(event) => setStudentId(event.currentTarget.value)}
-              />
-            </div>
-          </Tooltip>
-        </div>
+        <nav className="tabs" aria-label="মূল নেভিগেশন">
+          <NavLink to="/" end className={({ isActive }) => `tab${isActive ? ' is-active' : ''}`}>
+            {labels.navClasses}
+            {classCount !== undefined && classCount > 0 && <span className="tab-count">{classCount}</span>}
+          </NavLink>
+          <NavLink to="/me" className={({ isActive }) => `tab${isActive ? ' is-active' : ''}`}>
+            {labels.navMyHolds}
+            {activeHolds > 0 && <span className="tab-count">{activeHolds}</span>}
+          </NavLink>
+        </nav>
 
-        <div className="desktop-live-status col-optional">
-          <span className="live-pulse-dot" aria-hidden="true" />
-          <span className="live-status-text">সরাসরি ডেটাবেস সংযোগ</span>
+        <div className={`brn${state}`}>
+          <label className="brn-label" htmlFor="student-id-input">
+            <span>{labels.studentId}</span>
+            <span className="brn-count" aria-live="polite">
+              {typed}/{ID_LENGTH}
+            </span>
+          </label>
+          <input
+            id="student-id-input"
+            className="brn-input"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={ID_LENGTH}
+            placeholder={labels.studentIdPlaceholder}
+            aria-label={labels.studentId}
+            value={studentId}
+            onChange={(event) => setStudentId(event.currentTarget.value)}
+          />
+          <span className="brn-ticks" aria-hidden="true">
+            {Array.from({ length: ID_LENGTH }, (_, index) => (
+              <i key={index} className={index < typed ? 'is-filled' : undefined} />
+            ))}
+          </span>
         </div>
       </div>
-    </div>
+    </header>
   );
 }
