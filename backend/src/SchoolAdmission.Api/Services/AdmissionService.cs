@@ -72,26 +72,7 @@ public class AdmissionService
 
     public async Task<ClassResponse> CreateClassAsync(CreateClassRequest? request, CancellationToken cancellationToken = default)
     {
-        if (request is null)
-        {
-            throw ApiException.InvalidInput("A request body is required.");
-        }
-
-        var name = request.Name?.Trim();
-        if (string.IsNullOrEmpty(name))
-        {
-            throw ApiException.InvalidInput("Class name is required.");
-        }
-
-        if (name.Length > MaxClassNameLength)
-        {
-            throw ApiException.InvalidInput($"Class name must be at most {MaxClassNameLength} characters.");
-        }
-
-        if (request.TotalSeats is null or <= 0)
-        {
-            throw ApiException.InvalidInput("Total seats must be a whole number greater than zero.");
-        }
+        var (name, totalSeats) = ReadClassRequest(request);
 
         var now = await _db.NowAsync(cancellationToken);
 
@@ -99,7 +80,7 @@ public class AdmissionService
         {
             Id = Ids.NewClassId(),
             Name = name,
-            TotalSeats = request.TotalSeats.Value,
+            TotalSeats = totalSeats,
             CreatedAt = now
         };
 
@@ -107,6 +88,52 @@ public class AdmissionService
         await _db.SaveChangesAsync(cancellationToken);
 
         return new ClassResponse(entity.Id, entity.Name, entity.TotalSeats, 0, 0, entity.TotalSeats);
+    }
+
+    public async Task<ClassResponse> UpdateClassAsync(
+        string classId,
+        CreateClassRequest? request,
+        CancellationToken cancellationToken = default)
+    {
+        var (name, totalSeats) = ReadClassRequest(request);
+
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+
+        var currentSeats = await LockClassRowAsync(classId, cancellationToken);
+        if (currentSeats < 0)
+        {
+            throw ApiException.ClassNotFound(classId);
+        }
+
+        var entity = await _db.Classes.FindAsync(new object[] { classId }, cancellationToken);
+        if (entity is null)
+        {
+            throw ApiException.ClassNotFound(classId);
+        }
+
+        var now = await _db.NowAsync(cancellationToken);
+        var usage = await _db.Database
+            .SqlQueryRaw<SeatUsageRow>(SeatUsageSql, classId, now)
+            .SingleAsync(cancellationToken);
+
+        var taken = usage.HeldSeats + usage.ConfirmedSeats;
+        if (totalSeats < taken)
+        {
+            throw ApiException.SeatsInUse(taken);
+        }
+
+        entity.Name = name;
+        entity.TotalSeats = totalSeats;
+        await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return new ClassResponse(
+            entity.Id,
+            entity.Name,
+            entity.TotalSeats,
+            usage.HeldSeats,
+            usage.ConfirmedSeats,
+            totalSeats - taken);
     }
 
     public async Task<IReadOnlyList<ClassResponse>> ListClassesAsync(CancellationToken cancellationToken = default)
@@ -382,6 +409,32 @@ public class AdmissionService
         row.HeldSeats,
         row.ConfirmedSeats,
         row.AvailableSeats);
+
+    private static (string Name, int TotalSeats) ReadClassRequest(CreateClassRequest? request)
+    {
+        if (request is null)
+        {
+            throw ApiException.InvalidInput("A request body is required.");
+        }
+
+        var name = request.Name?.Trim();
+        if (string.IsNullOrEmpty(name))
+        {
+            throw ApiException.InvalidInput("Class name is required.");
+        }
+
+        if (name.Length > MaxClassNameLength)
+        {
+            throw ApiException.InvalidInput($"Class name must be at most {MaxClassNameLength} characters.");
+        }
+
+        if (request.TotalSeats is null or <= 0)
+        {
+            throw ApiException.InvalidInput("Total seats must be a whole number greater than zero.");
+        }
+
+        return (name, request.TotalSeats.Value);
+    }
 
     private sealed record LockedHold(string StudentId, string Status, DateTimeOffset ExpiresAt);
 }

@@ -7,6 +7,7 @@ public static class ErrorCodes
     public const string ClassNotFound = "CLASS_NOT_FOUND";
     public const string HoldNotFound = "HOLD_NOT_FOUND";
     public const string NoSeats = "NO_SEATS";
+    public const string SeatsInUse = "SEATS_IN_USE";
     public const string AlreadyApplied = "ALREADY_APPLIED";
     public const string HoldExpired = "HOLD_EXPIRED";
     public const string HoldNotActive = "HOLD_NOT_ACTIVE";

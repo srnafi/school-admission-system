@@ -27,6 +27,13 @@ public static class ClassEndpoints
             CancellationToken cancellationToken) =>
             Results.Ok(await service.GetClassAsync(classId, cancellationToken)));
 
+        group.MapPut("/{classId}", async (
+            string classId,
+            CreateClassRequest? request,
+            AdmissionService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.UpdateClassAsync(classId, request, cancellationToken)));
+
         return app;
     }
 }

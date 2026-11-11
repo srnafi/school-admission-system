@@ -74,6 +74,18 @@ public static class ApiClientExtensions
     public static async Task<ClassDto> GetClassAsync(this HttpClient client, string classId) =>
         (await client.GetFromJsonAsync<ClassDto>($"/classes/{classId}"))!;
 
+    public static async Task<ClassDto> UpdateClassAsync(
+        this HttpClient client,
+        string classId,
+        string name,
+        int totalSeats)
+    {
+        var response = await client.PutAsJsonAsync($"/classes/{classId}", new { name, totalSeats });
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<ClassDto>())!;
+    }
+
     public static async Task<HoldDto> GetHoldAsync(this HttpClient client, string holdId) =>
         (await client.GetFromJsonAsync<HoldDto>($"/holds/{holdId}"))!;
 

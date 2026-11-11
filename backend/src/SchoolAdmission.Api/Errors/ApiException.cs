@@ -27,6 +27,10 @@ public class ApiException : Exception
     public static ApiException NoSeats() =>
         new(StatusCodes.Status409Conflict, ErrorCodes.NoSeats, "No seat is available in this class.");
 
+    public static ApiException SeatsInUse(int taken) =>
+        new(StatusCodes.Status409Conflict, ErrorCodes.SeatsInUse,
+            $"Seats cannot go below the {taken} already held or confirmed.");
+
     public static ApiException AlreadyApplied() =>
         new(StatusCodes.Status409Conflict, ErrorCodes.AlreadyApplied,
             "You already have an application in this class.");
