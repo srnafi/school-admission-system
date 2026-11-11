@@ -734,7 +734,7 @@ export default function App() {
                         <div className="text-lg font-semibold">{item.name}</div>
                         {activeHold && (
                           <span
-                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
                               activeHold.status === 'CONFIRMED'
                                 ? 'bg-emerald-100 text-emerald-800'
                                 : 'bg-amber-100 text-amber-800'
@@ -751,15 +751,15 @@ export default function App() {
                       <div className="mb-6 grid grid-cols-3 gap-2 text-center text-sm">
                         <div>
                           <div className="font-mono text-2xl font-semibold text-emerald-600">{item.availableSeats}</div>
-                          <div className="text-[10px] text-slate-500">{t('classes.available')}</div>
+                          <div className="text-[11px] text-slate-500">{t('classes.available')}</div>
                         </div>
                         <div>
                           <div className="font-mono text-2xl font-semibold text-amber-600">{item.heldSeats}</div>
-                          <div className="text-[10px] text-slate-500">{t('classes.held')}</div>
+                          <div className="text-[11px] text-slate-500">{t('classes.held')}</div>
                         </div>
                         <div>
                           <div className="font-mono text-2xl font-semibold text-blue-600">{item.confirmedSeats}</div>
-                          <div className="text-[10px] text-slate-500">{t('classes.confirmed')}</div>
+                          <div className="text-[11px] text-slate-500">{t('classes.confirmed')}</div>
                         </div>
                       </div>
 
