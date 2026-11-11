@@ -626,9 +626,15 @@ export default function App() {
                   onSubmit={(event) => void createClass(event)}
                   className="mt-3 grid gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-4 sm:grid-cols-[1fr_140px_auto]"
                 >
-                  <label className="flex flex-col gap-1 text-sm">
-                    <span className="text-xs font-medium text-slate-500">Class name</span>
+                  <div className="flex flex-col gap-1 text-sm">
+                    <label
+                      htmlFor="custom-class-name"
+                      className="text-xs font-medium text-slate-500"
+                    >
+                      Class name
+                    </label>
                     <input
+                      id="custom-class-name"
                       value={newClassName}
                       onChange={(event) => setNewClassName(event.currentTarget.value)}
                       placeholder="Class 8 - Evening Shift"
@@ -640,7 +646,7 @@ export default function App() {
                         This class already exists. Update it with the pickers above.
                       </span>
                     )}
-                  </label>
+                  </div>
                   <label className="flex flex-col gap-1 text-sm">
                     <span className="text-xs font-medium text-slate-500">Total seats</span>
                     <input
