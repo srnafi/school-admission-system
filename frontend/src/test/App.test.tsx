@@ -171,4 +171,52 @@ describe('admission desk', () => {
       expect.objectContaining({ method: 'POST' }),
     );
   });
+
+  it('orders classes by name and keeps applied classes last', async () => {
+    const list = [
+      { ...classDto, id: 'c5', name: 'Class 5 - Day Shift' },
+      { ...classDto, id: 'c10', name: 'Class 10 - Science' },
+      { ...classDto, id: 'c7', name: 'Class 7 - Morning Shift' },
+    ];
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.endsWith('/classes')) {
+          return json(list);
+        }
+
+        if (url.endsWith('/me/holds')) {
+          return json([
+            {
+              holdId: 'h7',
+              classId: 'c7',
+              className: 'Class 7 - Morning Shift',
+              status: 'HELD',
+              expiresAt,
+            },
+          ]);
+        }
+
+        return json([]);
+      }),
+    );
+
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText('17-digit Birth Registration No.'), {
+      target: { value: STUDENT_ID },
+    });
+
+    expect(await screen.findByText('Already applied')).toBeInTheDocument();
+
+    const cards = screen.getAllByRole('article').map((card) => card.textContent ?? '');
+
+    expect(cards[0]).toContain('Class 10 - Science');
+    expect(cards[1]).toContain('Class 5 - Day Shift');
+    expect(cards[2]).toContain('Class 7 - Morning Shift');
+    expect(cards[2]).toContain('View application');
+  });
 });

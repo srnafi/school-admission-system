@@ -72,8 +72,17 @@ const tabs: { id: Tab; label: string }[] = [
 
 const classNameOrder = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
-function sortClassesDesc(items: ClassDto[]): ClassDto[] {
-  return [...items].sort((a, b) => classNameOrder.compare(b.name, a.name));
+function sortClassesDesc(items: ClassDto[], applied: Set<string>): ClassDto[] {
+  return [...items].sort((a, b) => {
+    const appliedA = applied.has(a.id);
+    const appliedB = applied.has(b.id);
+
+    if (appliedA !== appliedB) {
+      return appliedA ? 1 : -1;
+    }
+
+    return classNameOrder.compare(b.name, a.name);
+  });
 }
 
 type ToastTone = 'success' | 'error' | 'warning';
@@ -149,7 +158,13 @@ export default function App() {
     selection?.kind === 'hold' ? myHolds.find((hold) => hold.holdId === selection.holdId) : undefined;
 
   const holdClock = selectedHold ? countdown(selectedHold.expiresAt, now) : null;
-  const sortedClasses = sortClassesDesc(classes);
+  const appliedHolds = new Map(
+    myHolds
+      .filter((hold) => hold.status === 'HELD' || hold.status === 'CONFIRMED')
+      .map((hold) => [hold.classId, hold]),
+  );
+  const sortedClasses = sortClassesDesc(classes, new Set(appliedHolds.keys()));
+  const selectedClassHold = selectedClass ? appliedHolds.get(selectedClass.id) : undefined;
 
   useEffect(() => {
     if (studentId) {
@@ -457,45 +472,72 @@ export default function App() {
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-                {sortedClasses.map((item) => (
-                  <article key={item.id} className="rounded-2xl border bg-white p-6 transition hover:shadow-sm">
-                    <div className="mb-1 text-lg font-semibold">{item.name}</div>
-                    <div className="mb-4 text-xs text-slate-500">Total Seats: {item.totalSeats}</div>
+                {sortedClasses.map((item) => {
+                  const activeHold = appliedHolds.get(item.id);
 
-                    <div className="mb-6 grid grid-cols-3 gap-2 text-center text-sm">
-                      <div>
-                        <div className="font-mono text-xl font-semibold text-emerald-600">{item.availableSeats}</div>
-                        <div className="text-[10px] text-slate-500">AVAILABLE</div>
+                  return (
+                    <article key={item.id} className="rounded-2xl border bg-white p-6 transition hover:shadow-sm">
+                      <div className="mb-1 flex items-start justify-between gap-2">
+                        <div className="text-lg font-semibold">{item.name}</div>
+                        {activeHold && (
+                          <span
+                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                              activeHold.status === 'CONFIRMED'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}
+                          >
+                            Already applied
+                          </span>
+                        )}
                       </div>
-                      <div>
-                        <div className="font-mono text-xl font-semibold text-amber-600">{item.heldSeats}</div>
-                        <div className="text-[10px] text-slate-500">HELD</div>
-                      </div>
-                      <div>
-                        <div className="font-mono text-xl font-semibold text-blue-600">{item.confirmedSeats}</div>
-                        <div className="text-[10px] text-slate-500">CONFIRMED</div>
-                      </div>
-                    </div>
+                      <div className="mb-4 text-xs text-slate-500">Total Seats: {item.totalSeats}</div>
 
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setSelection({ kind: 'class', classId: item.id })}
-                        className="flex-1 rounded-xl border py-2 text-sm hover:bg-slate-50"
-                      >
-                        View Details
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void applyForSeat(item)}
-                        disabled={applyDisabled || item.availableSeats === 0}
-                        className="flex-1 rounded-xl bg-blue-800 py-2 text-sm text-white hover:bg-blue-900 disabled:bg-slate-300"
-                      >
-                        {item.availableSeats === 0 ? 'Class Full' : 'Apply Now'}
-                      </button>
-                    </div>
-                  </article>
-                ))}
+                      <div className="mb-6 grid grid-cols-3 gap-2 text-center text-sm">
+                        <div>
+                          <div className="font-mono text-xl font-semibold text-emerald-600">{item.availableSeats}</div>
+                          <div className="text-[10px] text-slate-500">AVAILABLE</div>
+                        </div>
+                        <div>
+                          <div className="font-mono text-xl font-semibold text-amber-600">{item.heldSeats}</div>
+                          <div className="text-[10px] text-slate-500">HELD</div>
+                        </div>
+                        <div>
+                          <div className="font-mono text-xl font-semibold text-blue-600">{item.confirmedSeats}</div>
+                          <div className="text-[10px] text-slate-500">CONFIRMED</div>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelection({ kind: 'class', classId: item.id })}
+                          className="flex-1 rounded-xl border py-2 text-sm hover:bg-slate-50"
+                        >
+                          View Details
+                        </button>
+                        {activeHold ? (
+                          <button
+                            type="button"
+                            onClick={() => openHold(activeHold)}
+                            className="flex-1 rounded-xl border py-2 text-sm text-blue-700 hover:bg-slate-50"
+                          >
+                            View application
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => void applyForSeat(item)}
+                            disabled={applyDisabled || item.availableSeats === 0}
+                            className="flex-1 rounded-xl bg-blue-800 py-2 text-sm text-white hover:bg-blue-900 disabled:bg-slate-300"
+                          >
+                            {item.availableSeats === 0 ? 'Class Full' : 'Apply Now'}
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             )}
           </section>
@@ -591,14 +633,24 @@ export default function App() {
                   <div className="text-right font-mono text-blue-600">{selectedClass.confirmedSeats}</div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => void applyForSeat(selectedClass)}
-                  disabled={applyDisabled || selectedClass.availableSeats === 0}
-                  className="w-full rounded-2xl bg-blue-800 py-3 text-white hover:bg-blue-900 disabled:bg-slate-300"
-                >
-                  {selectedClass.availableSeats === 0 ? 'Class Full' : 'Apply for this Class'}
-                </button>
+                {selectedClassHold ? (
+                  <button
+                    type="button"
+                    onClick={() => openHold(selectedClassHold)}
+                    className="w-full rounded-2xl border py-3 text-blue-700 hover:bg-slate-50"
+                  >
+                    Already applied — view application
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void applyForSeat(selectedClass)}
+                    disabled={applyDisabled || selectedClass.availableSeats === 0}
+                    className="w-full rounded-2xl bg-blue-800 py-3 text-white hover:bg-blue-900 disabled:bg-slate-300"
+                  >
+                    {selectedClass.availableSeats === 0 ? 'Class Full' : 'Apply for this Class'}
+                  </button>
+                )}
               </>
             )}
 
