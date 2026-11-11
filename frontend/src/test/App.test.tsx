@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 
@@ -100,6 +100,13 @@ describe('admission desk', () => {
       expect.stringContaining('/holds/h1/confirm'),
       expect.objectContaining({ method: 'POST' }),
     );
+
+    const dismiss = screen.getAllByRole('button', { name: 'Dismiss notification' });
+    fireEvent.click(dismiss[0]);
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Seat held/)).not.toBeInTheDocument();
+    });
   });
 
   it('marks a class with no seats left as full', async () => {

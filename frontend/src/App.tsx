@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { CheckCircle, Clock, RefreshCw, Users, X, XCircle } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { CheckCircle, Clock, Info, RefreshCw, Users, X, XCircle } from 'lucide-react';
 import { api, ApiError } from './api/client';
 import type { ClassDto, HoldSummaryDto } from './api/types';
 
@@ -70,21 +70,70 @@ const tabs: { id: Tab; label: string }[] = [
   { id: 'admin', label: 'Admin' },
 ];
 
+type ToastTone = 'success' | 'error' | 'warning';
+
+interface Toast {
+  id: number;
+  tone: ToastTone;
+  text: string;
+}
+
+const toastTone: Record<ToastTone, { box: string; icon: typeof CheckCircle; iconClass: string }> = {
+  success: {
+    box: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    icon: CheckCircle,
+    iconClass: 'text-emerald-600',
+  },
+  error: {
+    box: 'border-red-200 bg-red-50 text-red-700',
+    icon: XCircle,
+    iconClass: 'text-red-600',
+  },
+  warning: {
+    box: 'border-amber-200 bg-amber-50 text-amber-800',
+    icon: Info,
+    iconClass: 'text-amber-600',
+  },
+};
+
+function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number) => void }) {
+  const tone = toastTone[toast.tone];
+  const Icon = tone.icon;
+
+  return (
+    <div
+      role={toast.tone === 'error' ? 'alert' : 'status'}
+      className={`pointer-events-auto flex w-full max-w-md items-start gap-3 rounded-xl border px-4 py-3 shadow-lg ${tone.box}`}
+    >
+      <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${tone.iconClass}`} />
+      <p className="flex-1 text-sm">{toast.text}</p>
+      <button
+        type="button"
+        onClick={() => onDismiss(toast.id)}
+        aria-label="Dismiss notification"
+        className="rounded p-0.5 opacity-60 hover:opacity-100"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
 export default function App() {
   const [studentId, setStudentId] = useState(() => sanitizeId(localStorage.getItem('studentId') ?? ''));
   const [classes, setClasses] = useState<ClassDto[]>([]);
   const [myHolds, setMyHolds] = useState<HoldSummaryDto[]>([]);
   const [tab, setTab] = useState<Tab>('classes');
   const [selection, setSelection] = useState<Selection>(null);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [offline, setOffline] = useState(false);
+  const [toasts, setToasts] = useState<Toast[]>([]);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [newClassName, setNewClassName] = useState('');
   const [newSeatCount, setNewSeatCount] = useState('100');
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const toastSeq = useRef(0);
+  const offline = useRef(false);
 
   const validStudent = isCompleteId(studentId);
 
@@ -103,16 +152,34 @@ export default function App() {
     }
   }, [studentId]);
 
+  const dismissToast = (id: number) => {
+    setToasts((list) => list.filter((toast) => toast.id !== id));
+  };
+
+  const pushToast = useCallback((tone: ToastTone, text: string) => {
+    toastSeq.current += 1;
+    const id = toastSeq.current;
+
+    setToasts((list) => [...list, { id, tone, text }]);
+
+    if (tone === 'success') {
+      setTimeout(() => {
+        setToasts((list) => list.filter((toast) => toast.id !== id));
+      }, 6000);
+    }
+  }, []);
+
   const loadClasses = useCallback(async () => {
     try {
       setClasses(await api.listClasses());
-      setOffline(false);
+      offline.current = false;
     } catch (err) {
-      if (err instanceof ApiError && err.code === 'NETWORK_ERROR') {
-        setOffline(true);
+      if (err instanceof ApiError && err.code === 'NETWORK_ERROR' && !offline.current) {
+        offline.current = true;
+        pushToast('warning', "Can't reach the admission server. Retrying.");
       }
     }
-  }, []);
+  }, [pushToast]);
 
   const loadHolds = useCallback(async (id: string) => {
     if (!isCompleteId(id)) {
@@ -167,14 +234,8 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [selection]);
 
-  const clearMessages = () => {
-    setError('');
-    setNotice('');
-  };
-
   const handleIdChange = (value: string) => {
     setStudentId(sanitizeId(value));
-    clearMessages();
   };
 
   const refresh = async () => {
@@ -190,11 +251,10 @@ export default function App() {
     const seats = Number(newSeatCount);
 
     if (!name || !Number.isInteger(seats) || seats < 1) {
-      setError('Enter a class name and a seat count of at least 1.');
+      pushToast('error', 'Enter a class name and a seat count of at least 1.');
       return;
     }
 
-    clearMessages();
     setSaving(true);
 
     try {
@@ -203,9 +263,9 @@ export default function App() {
       setNewClassName('');
       setNewSeatCount('100');
       setTab('classes');
-      setNotice(`Class "${name}" created.`);
+      pushToast('success', `Class "${name}" created.`);
     } catch (err) {
-      setError(describeError(err));
+      pushToast('error', describeError(err));
     } finally {
       setSaving(false);
     }
@@ -213,11 +273,10 @@ export default function App() {
 
   const applyForSeat = async (item: ClassDto) => {
     if (!validStudent) {
-      setError('Enter your 17-digit Birth Registration Number before applying.');
+      pushToast('error', 'Enter your 17-digit Birth Registration Number before applying.');
       return;
     }
 
-    clearMessages();
     setBusy(true);
 
     try {
@@ -226,24 +285,23 @@ export default function App() {
       setSelection({ kind: 'hold', holdId: hold.holdId });
       setNow(Date.now());
       setTab('myapps');
-      setNotice('Seat held. Pay before the hold expires to confirm your admission.');
+      pushToast('success', 'Seat held. Pay before the hold expires to confirm your admission.');
     } catch (err) {
-      setError(describeError(err));
+      pushToast('error', describeError(err));
     } finally {
       setBusy(false);
     }
   };
 
   const confirmPayment = async (holdIdToConfirm: string) => {
-    clearMessages();
     setBusy(true);
 
     try {
       await api.confirmHold(holdIdToConfirm, studentId);
       await Promise.all([loadHolds(studentId), loadClasses()]);
-      setNotice('Payment recorded. Your admission is confirmed.');
+      pushToast('success', 'Payment recorded. Your admission is confirmed.');
     } catch (err) {
-      setError(describeError(err));
+      pushToast('error', describeError(err));
       await loadHolds(studentId);
     } finally {
       setBusy(false);
@@ -251,16 +309,15 @@ export default function App() {
   };
 
   const cancelApplication = async (holdIdToCancel: string) => {
-    clearMessages();
     setBusy(true);
 
     try {
       await api.cancelHold(holdIdToCancel, studentId);
       await Promise.all([loadHolds(studentId), loadClasses()]);
       setSelection(null);
-      setNotice('Application cancelled. The seat is available again.');
+      pushToast('success', 'Application cancelled. The seat is available again.');
     } catch (err) {
-      setError(describeError(err));
+      pushToast('error', describeError(err));
     } finally {
       setBusy(false);
     }
@@ -316,22 +373,6 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-8">
-        {offline && (
-          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            Can't reach the admission server. Retrying.
-          </div>
-        )}
-        {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-        {notice && (
-          <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-            {notice}
-          </div>
-        )}
-
         <div className="mb-6 flex border-b">
           {tabs.map(({ id, label }) => (
             <button
@@ -393,7 +434,7 @@ export default function App() {
         {tab === 'classes' && (
           <section aria-label="Available classes">
             <div className="mb-4 flex items-center justify-between">
-              <div className="font-medium">All Classes — Live Seat Status (auto-refreshes every 4s)</div>
+              <div className="font-medium">All Classes</div>
               <button
                 type="button"
                 onClick={() => void refresh()}
@@ -608,6 +649,14 @@ export default function App() {
               </>
             )}
           </div>
+        </div>
+      )}
+
+      {toasts.length > 0 && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[60] flex flex-col items-center gap-2 px-4 pb-4">
+          {toasts.map((toast) => (
+            <ToastView key={toast.id} toast={toast} onDismiss={dismissToast} />
+          ))}
         </div>
       )}
     </div>
