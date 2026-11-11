@@ -70,6 +70,9 @@ const tabs: { id: Tab; label: string }[] = [
   { id: 'admin', label: 'Admin' },
 ];
 
+const classNumbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
+const shifts = ['Morning', 'Day'];
+
 const classNameOrder = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 function sortClassesDesc(items: ClassDto[], applied: Set<string>): ClassDto[] {
@@ -143,6 +146,10 @@ export default function App() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [presetClassNo, setPresetClassNo] = useState('6');
+  const [presetShift, setPresetShift] = useState('Morning');
+  const [presetSeats, setPresetSeats] = useState('100');
+  const [customOpen, setCustomOpen] = useState(false);
   const [newClassName, setNewClassName] = useState('');
   const [newSeatCount, setNewSeatCount] = useState('100');
   const [refreshing, setRefreshing] = useState(false);
@@ -165,6 +172,7 @@ export default function App() {
   );
   const sortedClasses = sortClassesDesc(classes, new Set(appliedHolds.keys()));
   const selectedClassHold = selectedClass ? appliedHolds.get(selectedClass.id) : undefined;
+  const presetName = `Class ${presetClassNo} - ${presetShift} Shift`;
 
   useEffect(() => {
     if (studentId) {
@@ -293,8 +301,30 @@ export default function App() {
     }
   };
 
-  const applyForSeat = async (item: ClassDto) => {
-    if (!validStudent) {
+  const savePresetClass = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const seats = Number(presetSeats);
+    if (!Number.isInteger(seats) || seats < 1) {
+      pushToast('error', 'Enter a seat count of at least 1.');
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      await api.createClass(presetName, seats);
+      await loadClasses();
+      setTab('classes');
+      pushToast('success', `Class "${presetName}" created.`);
+    } catch (err) {
+      pushToast('error', describeError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const applyForSeat = async (item: ClassDto) => {    if (!validStudent) {
       pushToast('error', 'Enter your 17-digit Birth Registration Number before applying.');
       return;
     }
@@ -411,45 +441,112 @@ export default function App() {
         </div>
 
         {tab === 'admin' && (
-          <section aria-label="Admin" className="max-w-2xl">
-            <h2 className="text-lg font-semibold">Create a class</h2>
+          <section aria-label="Admin" className="max-w-3xl">
+            <h2 className="text-lg font-semibold">Add a class</h2>
             <p className="mb-4 text-sm text-slate-600">
-              A new class appears in Available Classes as soon as it is created.
+              Pick a class and shift, then set the seat count.
             </p>
+
             <form
-              onSubmit={(event) => void createClass(event)}
-              className="grid gap-4 rounded-2xl border bg-white p-6 md:grid-cols-[1fr_160px_auto]"
+              onSubmit={(event) => void savePresetClass(event)}
+              className="grid gap-4 rounded-2xl border bg-white p-6 sm:grid-cols-[140px_150px_1fr_auto]"
             >
               <label className="flex flex-col gap-1 text-sm">
-                <span className="text-xs font-medium text-slate-500">Class name</span>
-                <input
-                  value={newClassName}
-                  onChange={(event) => setNewClassName(event.currentTarget.value)}
-                  placeholder="Class 8 - Morning Shift"
-                  maxLength={200}
-                  className="rounded-xl border px-4 py-3"
-                />
+                <span className="text-xs font-medium text-slate-500">Class</span>
+                <select
+                  value={presetClassNo}
+                  onChange={(event) => setPresetClassNo(event.currentTarget.value)}
+                  className="rounded-xl border bg-white px-3 py-3"
+                >
+                  {classNumbers.map((number) => (
+                    <option key={number} value={number}>
+                      Class {number}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="flex flex-col gap-1 text-sm">
-                <span className="text-xs font-medium text-slate-500">Total seats</span>
+                <span className="text-xs font-medium text-slate-500">Shift</span>
+                <select
+                  value={presetShift}
+                  onChange={(event) => setPresetShift(event.currentTarget.value)}
+                  className="rounded-xl border bg-white px-3 py-3"
+                >
+                  {shifts.map((shift) => (
+                    <option key={shift} value={shift}>
+                      {shift}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-xs font-medium text-slate-500">Seats</span>
                 <input
                   type="number"
                   min={1}
-                  value={newSeatCount}
-                  onChange={(event) => setNewSeatCount(event.currentTarget.value)}
+                  value={presetSeats}
+                  onChange={(event) => setPresetSeats(event.currentTarget.value)}
                   className="rounded-xl border px-4 py-3 font-mono"
                 />
               </label>
               <div className="flex items-end">
                 <button
                   type="submit"
-                  disabled={saving || !newClassName.trim()}
+                  disabled={saving}
                   className="w-full rounded-xl bg-blue-800 px-6 py-3 text-white hover:bg-blue-900 disabled:bg-slate-300"
                 >
-                  {saving ? 'Creating…' : 'Create Class'}
+                  {saving ? 'Saving…' : 'Create class'}
                 </button>
               </div>
             </form>
+
+            <div className="mt-6 border-t border-slate-200 pt-4">
+              <button
+                type="button"
+                onClick={() => setCustomOpen((open) => !open)}
+                aria-expanded={customOpen}
+                className="text-xs text-slate-400 underline underline-offset-2 hover:text-slate-600"
+              >
+                {customOpen ? 'Hide custom class form' : 'Add a custom class instead'}
+              </button>
+
+              {customOpen && (
+                <form
+                  onSubmit={(event) => void createClass(event)}
+                  className="mt-3 grid gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-4 sm:grid-cols-[1fr_140px_auto]"
+                >
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-xs font-medium text-slate-500">Class name</span>
+                    <input
+                      value={newClassName}
+                      onChange={(event) => setNewClassName(event.currentTarget.value)}
+                      placeholder="Class 8 - Evening Shift"
+                      maxLength={200}
+                      className="rounded-xl border bg-white px-3 py-2"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-xs font-medium text-slate-500">Total seats</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={newSeatCount}
+                      onChange={(event) => setNewSeatCount(event.currentTarget.value)}
+                      className="rounded-xl border bg-white px-3 py-2 font-mono"
+                    />
+                  </label>
+                  <div className="flex items-end">
+                    <button
+                      type="submit"
+                      disabled={saving || !newClassName.trim()}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 disabled:text-slate-400"
+                    >
+                      {saving ? 'Creating…' : 'Create custom class'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
           </section>
         )}
 

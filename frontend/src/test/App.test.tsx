@@ -159,16 +159,65 @@ describe('admission desk', () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Admin' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add a custom class instead' }));
     fireEvent.change(screen.getByLabelText('Class name'), {
       target: { value: 'Class 9 - Science' },
     });
     fireEvent.change(screen.getByLabelText('Total seats'), { target: { value: '32' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create Class' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create custom class' }));
 
     expect(await screen.findByText('Class 9 - Science')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringMatching(/\/classes$/),
       expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('creates a class from the class and shift pickers', async () => {
+    const classes: (typeof classDto)[] = [];
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = (init?.method ?? 'GET').toUpperCase();
+
+      if (url.endsWith('/classes') && method === 'POST') {
+        const body = JSON.parse(String(init?.body)) as { name: string; totalSeats: number };
+        const created = {
+          id: 'c2',
+          name: body.name,
+          totalSeats: body.totalSeats,
+          heldSeats: 0,
+          confirmedSeats: 0,
+          availableSeats: body.totalSeats,
+        };
+        classes.push(created);
+        return json(created, 201);
+      }
+
+      if (url.endsWith('/classes')) {
+        return json(classes);
+      }
+
+      return json([]);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Admin' }));
+    fireEvent.change(screen.getByLabelText('Class'), { target: { value: '8' } });
+    fireEvent.change(screen.getByLabelText('Shift'), { target: { value: 'Day' } });
+    fireEvent.change(screen.getByLabelText('Seats'), { target: { value: '35' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create class' }));
+
+    expect(await screen.findByText('Class 8 - Day Shift')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/classes$/),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ name: 'Class 8 - Day Shift', totalSeats: 35 }),
+      }),
     );
   });
 
