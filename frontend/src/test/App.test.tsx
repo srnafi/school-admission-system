@@ -86,7 +86,7 @@ describe('admission desk', () => {
 
     expect(await screen.findByText('Class 6 - Morning Shift')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('17-digit Birth Registration No.'), {
+    fireEvent.change(screen.getByLabelText('Birth Registration No. (BRN)'), {
       target: { value: STUDENT_ID },
     });
     fireEvent.click(await screen.findByRole('button', { name: 'Apply Now' }));
@@ -330,7 +330,7 @@ describe('admission desk', () => {
 
     render(<App />);
 
-    fireEvent.change(screen.getByLabelText('17-digit Birth Registration No.'), {
+    fireEvent.change(screen.getByLabelText('Birth Registration No. (BRN)'), {
       target: { value: STUDENT_ID },
     });
 

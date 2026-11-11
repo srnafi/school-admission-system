@@ -518,10 +518,21 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1.5">
-              <Users className="h-4 w-4 text-slate-500" />
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor="student-id"
+              className="text-[11px] font-semibold uppercase tracking-wide text-slate-500"
+            >
+              Birth Registration No. (BRN)
+            </label>
+            <div
+              className={`flex items-center gap-2 rounded-xl border bg-white px-4 py-2.5 transition-colors focus-within:border-blue-700 ${
+                validStudent ? 'border-emerald-600' : 'border-slate-300'
+              }`}
+            >
+              <Users className="h-5 w-5 shrink-0 text-slate-400" />
               <input
+                id="student-id"
                 type="text"
                 inputMode="numeric"
                 autoComplete="off"
@@ -529,15 +540,19 @@ export default function App() {
                 maxLength={ID_LENGTH}
                 value={studentId}
                 onChange={(event) => handleIdChange(event.currentTarget.value)}
-                placeholder="17-digit Birth Registration No."
-                aria-label="17-digit Birth Registration No."
-                className="w-56 bg-transparent font-mono text-sm outline-none placeholder:text-slate-400"
+                placeholder="17-digit number"
+                className="w-64 bg-transparent font-mono text-base outline-none placeholder:text-slate-400"
               />
-            </div>
-            {studentId.length > 0 && !validStudent && (
-              <span className="text-xs text-red-500">
+              <span
+                className={`shrink-0 font-mono text-xs ${
+                  validStudent ? 'text-emerald-700' : 'text-slate-400'
+                }`}
+              >
                 {studentId.length}/{ID_LENGTH}
               </span>
+            </div>
+            {studentId.length > 0 && !validStudent && (
+              <span className="text-xs text-red-500">Enter all 17 digits.</span>
             )}
           </div>
         </div>
@@ -641,11 +656,6 @@ export default function App() {
                       maxLength={200}
                       className="rounded-xl border bg-white px-3 py-2"
                     />
-                    {customMatch && (
-                      <span className="text-xs text-amber-700">
-                        This class already exists. Update it with the pickers above.
-                      </span>
-                    )}
                   </div>
                   <label className="flex flex-col gap-1 text-sm">
                     <span className="text-xs font-medium text-slate-500">Total seats</span>
@@ -666,6 +676,12 @@ export default function App() {
                       {saving ? 'Creating…' : 'Create custom class'}
                     </button>
                   </div>
+
+                  {customMatch && (
+                    <p className="text-xs text-amber-700 sm:col-span-3">
+                      This class already exists. Update it with the pickers above.
+                    </p>
+                  )}
                 </form>
               )}
             </div>
