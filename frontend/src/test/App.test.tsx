@@ -118,4 +118,50 @@ describe('admission desk', () => {
 
     expect(await screen.findByRole('button', { name: 'Class Full' })).toBeDisabled();
   });
+
+  it('creates a class from the admin tab', async () => {
+    const classes = [{ ...classDto }];
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = (init?.method ?? 'GET').toUpperCase();
+
+      if (url.endsWith('/classes') && method === 'POST') {
+        const body = JSON.parse(String(init?.body)) as { name: string; totalSeats: number };
+        const created = {
+          id: 'c2',
+          name: body.name,
+          totalSeats: body.totalSeats,
+          heldSeats: 0,
+          confirmedSeats: 0,
+          availableSeats: body.totalSeats,
+        };
+        classes.push(created);
+        return json(created, 201);
+      }
+
+      if (url.endsWith('/classes')) {
+        return json(classes);
+      }
+
+      return json([]);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Admin' }));
+    fireEvent.change(screen.getByLabelText('Class name'), {
+      target: { value: 'Class 9 - Science' },
+    });
+    fireEvent.change(screen.getByLabelText('Total seats'), { target: { value: '32' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Class' }));
+
+    expect(await screen.findByText('Class 9 - Science')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/classes$/),
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
 });

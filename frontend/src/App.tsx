@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { CheckCircle, Clock, Plus, RefreshCw, Users, X, XCircle } from 'lucide-react';
+import { CheckCircle, Clock, RefreshCw, Users, X, XCircle } from 'lucide-react';
 import { api, ApiError } from './api/client';
 import type { ClassDto, HoldSummaryDto } from './api/types';
 
 const ID_LENGTH = 17;
 
-type Tab = 'classes' | 'myapps';
+type Tab = 'classes' | 'myapps' | 'admin';
 type Selection = { kind: 'class'; classId: string } | { kind: 'hold'; holdId: string } | null;
 
 function sanitizeId(value: string): string {
@@ -64,6 +64,12 @@ const statusTone: Record<string, string> = {
   CANCELLED: 'bg-slate-200 text-slate-600',
 };
 
+const tabs: { id: Tab; label: string }[] = [
+  { id: 'classes', label: 'Available Classes' },
+  { id: 'myapps', label: 'My Applications' },
+  { id: 'admin', label: 'Admin' },
+];
+
 export default function App() {
   const [studentId, setStudentId] = useState(() => sanitizeId(localStorage.getItem('studentId') ?? ''));
   const [classes, setClasses] = useState<ClassDto[]>([]);
@@ -75,7 +81,6 @@ export default function App() {
   const [offline, setOffline] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [showCreate, setShowCreate] = useState(false);
   const [newClassName, setNewClassName] = useState('');
   const [newSeatCount, setNewSeatCount] = useState('100');
   const [refreshing, setRefreshing] = useState(false);
@@ -195,9 +200,9 @@ export default function App() {
     try {
       await api.createClass(name, seats);
       await loadClasses();
-      setShowCreate(false);
       setNewClassName('');
       setNewSeatCount('100');
+      setTab('classes');
       setNotice(`Class "${name}" created.`);
     } catch (err) {
       setError(describeError(err));
@@ -328,73 +333,61 @@ export default function App() {
         )}
 
         <div className="mb-6 flex border-b">
-          <button
-            type="button"
-            onClick={() => setTab('classes')}
-            className={`px-6 py-3 font-medium ${
-              tab === 'classes' ? 'border-b-2 border-blue-800 text-blue-800' : 'text-slate-500'
-            }`}
-          >
-            Available Classes
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('myapps')}
-            className={`px-6 py-3 font-medium ${
-              tab === 'myapps' ? 'border-b-2 border-blue-800 text-blue-800' : 'text-slate-500'
-            }`}
-          >
-            My Applications
-          </button>
+          {tabs.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTab(id)}
+              className={`px-6 py-3 font-medium ${
+                tab === id ? 'border-b-2 border-blue-800 text-blue-800' : 'text-slate-500'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
-        <div className="mb-8 flex items-center justify-between">
-          <div className="text-sm text-slate-600">Admin Panel — Create new classes below</div>
-          <button
-            type="button"
-            onClick={() => setShowCreate((open) => !open)}
-            aria-expanded={showCreate}
-            className="flex items-center gap-2 rounded-lg bg-blue-800 px-4 py-2 text-sm text-white hover:bg-blue-900"
-          >
-            <Plus className="h-4 w-4" /> Create Class
-          </button>
-        </div>
-
-        {showCreate && (
-          <form
-            onSubmit={(event) => void createClass(event)}
-            className="mb-8 grid gap-4 rounded-2xl border bg-white p-6 md:grid-cols-[1fr_160px_auto]"
-          >
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-xs font-medium text-slate-500">Class name</span>
-              <input
-                value={newClassName}
-                onChange={(event) => setNewClassName(event.currentTarget.value)}
-                placeholder="Class 8 - Morning Shift"
-                maxLength={200}
-                className="rounded-xl border px-4 py-3"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-xs font-medium text-slate-500">Total seats</span>
-              <input
-                type="number"
-                min={1}
-                value={newSeatCount}
-                onChange={(event) => setNewSeatCount(event.currentTarget.value)}
-                className="rounded-xl border px-4 py-3 font-mono"
-              />
-            </label>
-            <div className="flex items-end">
-              <button
-                type="submit"
-                disabled={saving || !newClassName.trim()}
-                className="w-full rounded-xl bg-blue-800 px-6 py-3 text-white hover:bg-blue-900 disabled:bg-slate-300"
-              >
-                {saving ? 'Creating…' : 'Create Class'}
-              </button>
-            </div>
-          </form>
+        {tab === 'admin' && (
+          <section aria-label="Admin" className="max-w-2xl">
+            <h2 className="text-lg font-semibold">Create a class</h2>
+            <p className="mb-4 text-sm text-slate-600">
+              A new class appears in Available Classes as soon as it is created.
+            </p>
+            <form
+              onSubmit={(event) => void createClass(event)}
+              className="grid gap-4 rounded-2xl border bg-white p-6 md:grid-cols-[1fr_160px_auto]"
+            >
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-xs font-medium text-slate-500">Class name</span>
+                <input
+                  value={newClassName}
+                  onChange={(event) => setNewClassName(event.currentTarget.value)}
+                  placeholder="Class 8 - Morning Shift"
+                  maxLength={200}
+                  className="rounded-xl border px-4 py-3"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-xs font-medium text-slate-500">Total seats</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={newSeatCount}
+                  onChange={(event) => setNewSeatCount(event.currentTarget.value)}
+                  className="rounded-xl border px-4 py-3 font-mono"
+                />
+              </label>
+              <div className="flex items-end">
+                <button
+                  type="submit"
+                  disabled={saving || !newClassName.trim()}
+                  className="w-full rounded-xl bg-blue-800 px-6 py-3 text-white hover:bg-blue-900 disabled:bg-slate-300"
+                >
+                  {saving ? 'Creating…' : 'Create Class'}
+                </button>
+              </div>
+            </form>
+          </section>
         )}
 
         {tab === 'classes' && (
