@@ -2,6 +2,8 @@
    School admission desk — chart paper, hairline rules, inked stamps
    ========================================================================== */
 
+@import "tailwindcss";
+
 @font-face {
   font-family: 'Anek Bangla';
   src: url('/fonts/anek-bangla-bengali.woff2') format('woff2');
