@@ -70,6 +70,12 @@ const tabs: { id: Tab; label: string }[] = [
   { id: 'admin', label: 'Admin' },
 ];
 
+const classNameOrder = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+function sortClassesDesc(items: ClassDto[]): ClassDto[] {
+  return [...items].sort((a, b) => classNameOrder.compare(b.name, a.name));
+}
+
 type ToastTone = 'success' | 'error' | 'warning';
 
 interface Toast {
@@ -143,6 +149,7 @@ export default function App() {
     selection?.kind === 'hold' ? myHolds.find((hold) => hold.holdId === selection.holdId) : undefined;
 
   const holdClock = selectedHold ? countdown(selectedHold.expiresAt, now) : null;
+  const sortedClasses = sortClassesDesc(classes);
 
   useEffect(() => {
     if (studentId) {
@@ -450,7 +457,7 @@ export default function App() {
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-                {classes.map((item) => (
+                {sortedClasses.map((item) => (
                   <article key={item.id} className="rounded-2xl border bg-white p-6 transition hover:shadow-sm">
                     <div className="mb-1 text-lg font-semibold">{item.name}</div>
                     <div className="mb-4 text-xs text-slate-500">Total Seats: {item.totalSeats}</div>
