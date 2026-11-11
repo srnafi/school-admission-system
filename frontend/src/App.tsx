@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle, Clock, RefreshCw, Users, X, XCircle } from 'lucide-react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { CheckCircle, Clock, Plus, RefreshCw, Users, X, XCircle } from 'lucide-react';
 import { api, ApiError } from './api/client';
 import type { ClassDto, HoldSummaryDto } from './api/types';
 
@@ -37,6 +37,8 @@ function describeError(err: unknown): string {
         return 'This application belongs to another student.';
       case 'NETWORK_ERROR':
         return 'The admission server could not be reached.';
+      case 'INVALID_INPUT':
+        return 'Check the class name and seat count.';
       default:
         return err.message || 'Something went wrong. Try again.';
     }
@@ -72,6 +74,10 @@ export default function App() {
   const [notice, setNotice] = useState('');
   const [offline, setOffline] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newClassName, setNewClassName] = useState('');
+  const [newSeatCount, setNewSeatCount] = useState('100');
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
@@ -136,7 +142,6 @@ export default function App() {
       return;
     }
 
-    setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1000);
 
     return () => clearInterval(timer);
@@ -173,6 +178,34 @@ export default function App() {
     setRefreshing(false);
   };
 
+  const createClass = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const name = newClassName.trim();
+    const seats = Number(newSeatCount);
+
+    if (!name || !Number.isInteger(seats) || seats < 1) {
+      setError('Enter a class name and a seat count of at least 1.');
+      return;
+    }
+
+    clearMessages();
+    setSaving(true);
+
+    try {
+      await api.createClass(name, seats);
+      await loadClasses();
+      setShowCreate(false);
+      setNewClassName('');
+      setNewSeatCount('100');
+      setNotice(`Class "${name}" created.`);
+    } catch (err) {
+      setError(describeError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const applyForSeat = async (item: ClassDto) => {
     if (!validStudent) {
       setError('Enter your 17-digit Birth Registration Number before applying.');
@@ -186,6 +219,7 @@ export default function App() {
       const hold = await api.createHold(item.id, studentId);
       await Promise.all([loadClasses(), loadHolds(studentId)]);
       setSelection({ kind: 'hold', holdId: hold.holdId });
+      setNow(Date.now());
       setTab('myapps');
       setNotice('Seat held. Pay within 10 minutes to confirm your admission.');
     } catch (err) {
@@ -229,6 +263,7 @@ export default function App() {
 
   const openHold = (hold: HoldSummaryDto) => {
     setSelection({ kind: 'hold', holdId: hold.holdId });
+    setNow(Date.now());
     setTab('myapps');
   };
 
@@ -312,6 +347,56 @@ export default function App() {
             My Applications
           </button>
         </div>
+
+        <div className="mb-8 flex items-center justify-between">
+          <div className="text-sm text-slate-600">Admin Panel — Create new classes below</div>
+          <button
+            type="button"
+            onClick={() => setShowCreate((open) => !open)}
+            aria-expanded={showCreate}
+            className="flex items-center gap-2 rounded-lg bg-blue-800 px-4 py-2 text-sm text-white hover:bg-blue-900"
+          >
+            <Plus className="h-4 w-4" /> Create Class
+          </button>
+        </div>
+
+        {showCreate && (
+          <form
+            onSubmit={(event) => void createClass(event)}
+            className="mb-8 grid gap-4 rounded-2xl border bg-white p-6 md:grid-cols-[1fr_160px_auto]"
+          >
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-xs font-medium text-slate-500">Class name</span>
+              <input
+                value={newClassName}
+                onChange={(event) => setNewClassName(event.currentTarget.value)}
+                placeholder="Class 8 - Morning Shift"
+                maxLength={120}
+                className="rounded-xl border px-4 py-3"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-xs font-medium text-slate-500">Total seats</span>
+              <input
+                type="number"
+                min={1}
+                max={10000}
+                value={newSeatCount}
+                onChange={(event) => setNewSeatCount(event.currentTarget.value)}
+                className="rounded-xl border px-4 py-3 font-mono"
+              />
+            </label>
+            <div className="flex items-end">
+              <button
+                type="submit"
+                disabled={saving || !newClassName.trim()}
+                className="w-full rounded-xl bg-blue-800 px-6 py-3 text-white hover:bg-blue-900 disabled:bg-slate-300"
+              >
+                {saving ? 'Creating…' : 'Create Class'}
+              </button>
+            </div>
+          </form>
+        )}
 
         {tab === 'classes' && (
           <section aria-label="Available classes">
