@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { CheckCircle, ChevronDown, Clock, Info, RefreshCw, Users, X, XCircle } from 'lucide-react';
+import { CheckCircle, ChevronDown, Clock, Info, Users, X, XCircle } from 'lucide-react';
 import { api, ApiError } from './api/client';
 import type { ClassDto, HoldSummaryDto } from './api/types';
 
@@ -245,7 +245,6 @@ export default function App() {
   const [customOpen, setCustomOpen] = useState(false);
   const [newClassName, setNewClassName] = useState('');
   const [newSeatCount, setNewSeatCount] = useState('100');
-  const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const toastSeq = useRef(0);
   const offline = useRef(false);
@@ -368,12 +367,6 @@ export default function App() {
 
   const handleIdChange = (value: string) => {
     setStudentId(sanitizeId(value));
-  };
-
-  const refresh = async () => {
-    setRefreshing(true);
-    await Promise.all([loadClasses(), loadHolds(studentId)]);
-    setRefreshing(false);
   };
 
   const createClass = async (event: FormEvent<HTMLFormElement>) => {
@@ -563,14 +556,14 @@ export default function App() {
           aria-label="Sections"
           className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-4 sm:static sm:mb-6 sm:justify-start sm:border-b sm:px-0 sm:pb-0"
         >
-          <div className="flex w-full max-w-md items-center gap-1 rounded-full border border-slate-200 bg-white/95 p-1.5 shadow-lg backdrop-blur sm:w-auto sm:max-w-none sm:gap-0 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-none">
+          <div className="flex w-full max-w-md items-center gap-1 rounded-2xl border border-slate-200 bg-white/95 p-1.5 shadow-lg backdrop-blur sm:w-auto sm:max-w-none sm:gap-0 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-none">
             {tabs.map(({ id, label, mobileLabel }) => (
               <button
                 key={id}
                 type="button"
                 onClick={() => setTab(id)}
                 aria-current={tab === id ? 'page' : undefined}
-                className={`flex-1 rounded-full px-3 py-2.5 text-xs font-medium sm:flex-none sm:rounded-none sm:px-6 sm:py-3 sm:text-sm ${
+                className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-medium transition-colors duration-200 ease-in sm:flex-none sm:rounded-none sm:px-6 sm:py-3 sm:text-sm ${
                   tab === id
                     ? 'bg-blue-800 text-white sm:border-b-2 sm:border-blue-800 sm:bg-transparent sm:text-blue-800'
                     : 'text-slate-600 sm:text-slate-500'
@@ -705,16 +698,7 @@ export default function App() {
 
         {tab === 'classes' && (
           <section aria-label="Available classes">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="font-medium">All Classes</div>
-              <button
-                type="button"
-                onClick={() => void refresh()}
-                className="flex items-center gap-1 text-sm text-blue-700"
-              >
-                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
-              </button>
-            </div>
+            <div className="mb-4 font-medium">All Classes</div>
 
             {classes.length === 0 ? (
               <div className="rounded-2xl border bg-white px-6 py-16 text-center text-slate-500">
@@ -745,15 +729,15 @@ export default function App() {
 
                       <div className="mb-6 grid grid-cols-3 gap-2 text-center text-sm">
                         <div>
-                          <div className="font-mono text-xl font-semibold text-emerald-600">{item.availableSeats}</div>
+                          <div className="font-mono text-2xl font-semibold text-emerald-600">{item.availableSeats}</div>
                           <div className="text-[10px] text-slate-500">AVAILABLE</div>
                         </div>
                         <div>
-                          <div className="font-mono text-xl font-semibold text-amber-600">{item.heldSeats}</div>
+                          <div className="font-mono text-2xl font-semibold text-amber-600">{item.heldSeats}</div>
                           <div className="text-[10px] text-slate-500">HELD</div>
                         </div>
                         <div>
-                          <div className="font-mono text-xl font-semibold text-blue-600">{item.confirmedSeats}</div>
+                          <div className="font-mono text-2xl font-semibold text-blue-600">{item.confirmedSeats}</div>
                           <div className="text-[10px] text-slate-500">CONFIRMED</div>
                         </div>
                       </div>
@@ -947,7 +931,22 @@ export default function App() {
                 )}
 
                 {selectedHold.status === 'CONFIRMED' && (
-                  <div className="py-3 text-center text-emerald-700">Admission confirmed</div>
+                  <div className="py-3 text-center text-emerald-700">
+                    Admission confirmed
+                    <svg
+                      viewBox="0 0 140 12"
+                      className="mx-auto mt-1 block h-3 w-36 text-emerald-600"
+                      fill="none"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M2 8c15-5 31-6 47-3 10 2 21 2 33-1 12-3 27-2 56 3"
+                        stroke="currentColor"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </div>
                 )}
                 {selectedHold.status === 'EXPIRED' && (
                   <div className="py-3 text-center text-red-600">This hold has expired</div>
