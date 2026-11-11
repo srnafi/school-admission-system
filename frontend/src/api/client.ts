@@ -57,6 +57,12 @@ export const api = {
   createClass: (name: string, totalSeats: number) =>
     request<ClassDto>('/classes', { method: 'POST', body: JSON.stringify({ name, totalSeats }) }),
 
+  updateClass: (classId: string, name: string, totalSeats: number) =>
+    request<ClassDto>(`/classes/${encodeURIComponent(classId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name, totalSeats }),
+    }),
+
   createHold: (classId: string, studentId: string) =>
     request<HoldDto>(`/classes/${encodeURIComponent(classId)}/holds`, {
       method: 'POST',

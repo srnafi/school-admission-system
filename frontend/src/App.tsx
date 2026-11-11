@@ -39,6 +39,8 @@ function describeError(err: unknown): string {
         return 'The admission server could not be reached.';
       case 'INVALID_INPUT':
         return 'Check the class name and seat count.';
+      case 'SEATS_IN_USE':
+        return 'Seats cannot go below the seats already taken.';
       default:
         return err.message || 'Something went wrong. Try again.';
     }
@@ -148,7 +150,7 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [presetClassNo, setPresetClassNo] = useState('6');
   const [presetShift, setPresetShift] = useState('Morning');
-  const [presetSeats, setPresetSeats] = useState('100');
+  const [presetSeats, setPresetSeats] = useState<string | null>(null);
   const [customOpen, setCustomOpen] = useState(false);
   const [newClassName, setNewClassName] = useState('');
   const [newSeatCount, setNewSeatCount] = useState('100');
@@ -173,6 +175,11 @@ export default function App() {
   const sortedClasses = sortClassesDesc(classes, new Set(appliedHolds.keys()));
   const selectedClassHold = selectedClass ? appliedHolds.get(selectedClass.id) : undefined;
   const presetName = `Class ${presetClassNo} - ${presetShift} Shift`;
+  const presetMatch = classes.find(
+    (item) => item.name.toLowerCase() === presetName.toLowerCase(),
+  );
+  const presetTaken = presetMatch ? presetMatch.heldSeats + presetMatch.confirmedSeats : 0;
+  const presetSeatsValue = presetSeats ?? (presetMatch ? String(presetMatch.totalSeats) : '100');
 
   useEffect(() => {
     if (studentId) {
@@ -304,19 +311,31 @@ export default function App() {
   const savePresetClass = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const seats = Number(presetSeats);
+    const seats = Number(presetSeatsValue);
     if (!Number.isInteger(seats) || seats < 1) {
       pushToast('error', 'Enter a seat count of at least 1.');
+      return;
+    }
+
+    if (presetMatch && seats < presetTaken) {
+      pushToast('error', `Seats cannot go below the ${presetTaken} already taken.`);
       return;
     }
 
     setSaving(true);
 
     try {
-      await api.createClass(presetName, seats);
-      await loadClasses();
-      setTab('classes');
-      pushToast('success', `Class "${presetName}" created.`);
+      if (presetMatch) {
+        await api.updateClass(presetMatch.id, presetName, seats);
+        await loadClasses();
+        setTab('classes');
+        pushToast('success', `Class "${presetName}" updated.`);
+      } else {
+        await api.createClass(presetName, seats);
+        await loadClasses();
+        setTab('classes');
+        pushToast('success', `Class "${presetName}" created.`);
+      }
     } catch (err) {
       pushToast('error', describeError(err));
     } finally {
@@ -444,7 +463,9 @@ export default function App() {
           <section aria-label="Admin" className="max-w-3xl">
             <h2 className="text-lg font-semibold">Add a class</h2>
             <p className="mb-4 text-sm text-slate-600">
-              Pick a class and shift, then set the seat count.
+              {presetMatch
+                ? `${presetName} already exists with ${presetMatch.totalSeats} seats, ${presetTaken} already taken. Saving updates it.`
+                : 'Pick a class and shift, then set the seat count.'}
             </p>
 
             <form
@@ -455,7 +476,10 @@ export default function App() {
                 <span className="text-xs font-medium text-slate-500">Class</span>
                 <select
                   value={presetClassNo}
-                  onChange={(event) => setPresetClassNo(event.currentTarget.value)}
+                  onChange={(event) => {
+                    setPresetClassNo(event.currentTarget.value);
+                    setPresetSeats(null);
+                  }}
                   className="rounded-xl border bg-white px-3 py-3"
                 >
                   {classNumbers.map((number) => (
@@ -469,7 +493,10 @@ export default function App() {
                 <span className="text-xs font-medium text-slate-500">Shift</span>
                 <select
                   value={presetShift}
-                  onChange={(event) => setPresetShift(event.currentTarget.value)}
+                  onChange={(event) => {
+                    setPresetShift(event.currentTarget.value);
+                    setPresetSeats(null);
+                  }}
                   className="rounded-xl border bg-white px-3 py-3"
                 >
                   {shifts.map((shift) => (
@@ -483,8 +510,8 @@ export default function App() {
                 <span className="text-xs font-medium text-slate-500">Seats</span>
                 <input
                   type="number"
-                  min={1}
-                  value={presetSeats}
+                  min={Math.max(1, presetTaken)}
+                  value={presetSeatsValue}
                   onChange={(event) => setPresetSeats(event.currentTarget.value)}
                   className="rounded-xl border px-4 py-3 font-mono"
                 />
@@ -495,7 +522,7 @@ export default function App() {
                   disabled={saving}
                   className="w-full rounded-xl bg-blue-800 px-6 py-3 text-white hover:bg-blue-900 disabled:bg-slate-300"
                 >
-                  {saving ? 'Saving…' : 'Create class'}
+                  {saving ? 'Saving…' : presetMatch ? 'Update class' : 'Create class'}
                 </button>
               </div>
             </form>

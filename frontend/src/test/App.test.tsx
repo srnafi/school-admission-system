@@ -126,6 +126,53 @@ describe('admission desk', () => {
     expect(await screen.findByRole('button', { name: 'Class Full' })).toBeDisabled();
   });
 
+  it('updates the class when the picked name already exists', async () => {
+    const classes = [{ ...classDto }];
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = (init?.method ?? 'GET').toUpperCase();
+
+      if (url.endsWith('/classes/c1') && method === 'PUT') {
+        const body = JSON.parse(String(init?.body)) as { totalSeats: number };
+        classes[0] = {
+          ...classes[0],
+          totalSeats: body.totalSeats,
+          availableSeats: body.totalSeats - classes[0].heldSeats - classes[0].confirmedSeats,
+        };
+        return json(classes[0]);
+      }
+
+      if (url.endsWith('/classes')) {
+        return json(classes);
+      }
+
+      return json([]);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Admin' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Seats')).toHaveValue(40);
+    });
+
+    fireEvent.change(screen.getByLabelText('Seats'), { target: { value: '45' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Update class' }));
+
+    expect(await screen.findByText('Total Seats: 45')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/classes\/c1$/),
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ name: 'Class 6 - Morning Shift', totalSeats: 45 }),
+      }),
+    );
+  });
+
   it('creates a class from the admin tab', async () => {
     const classes = [{ ...classDto }];
 
