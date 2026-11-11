@@ -68,10 +68,10 @@ const statusTone: Record<string, string> = {
   CANCELLED: 'bg-slate-200 text-slate-600',
 };
 
-const tabs: { id: Tab; label: string }[] = [
-  { id: 'classes', label: 'Available Classes' },
-  { id: 'myapps', label: 'My Applications' },
-  { id: 'admin', label: 'Admin' },
+const tabs: { id: Tab; label: string; mobileLabel: string }[] = [
+  { id: 'classes', label: 'Available Classes', mobileLabel: 'Classes' },
+  { id: 'myapps', label: 'My Applications', mobileLabel: 'My Applications' },
+  { id: 'admin', label: 'Admin', mobileLabel: 'Admin' },
 ];
 
 const classNumbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
@@ -505,7 +505,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <header className="border-b bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-4">
+        <div className="mx-auto flex max-w-6xl flex-col px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-800 font-bold text-white">
               S
@@ -518,7 +518,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="mt-4 flex w-full flex-col gap-1.5 sm:mt-0 sm:w-auto">
             <label
               htmlFor="student-id"
               className="text-[11px] font-semibold uppercase tracking-wide text-slate-500"
@@ -541,7 +541,7 @@ export default function App() {
                 value={studentId}
                 onChange={(event) => handleIdChange(event.currentTarget.value)}
                 placeholder="17-digit number"
-                className="w-64 bg-transparent font-mono text-base outline-none placeholder:text-slate-400"
+                className="w-full min-w-0 bg-transparent font-mono text-base outline-none placeholder:text-slate-400 sm:w-64"
               />
               <span
                 className={`shrink-0 font-mono text-xs ${
@@ -558,21 +558,36 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-8">
-        <div className="mb-6 flex border-b">
-          {tabs.map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              className={`px-6 py-3 font-medium ${
-                tab === id ? 'border-b-2 border-blue-800 text-blue-800' : 'text-slate-500'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+      <main className="mx-auto max-w-6xl px-4 pb-28 pt-6 sm:px-6 sm:pb-8 sm:pt-8">
+        <nav
+          aria-label="Sections"
+          className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-4 sm:static sm:mb-6 sm:justify-start sm:border-b sm:px-0 sm:pb-0"
+        >
+          <div className="flex w-full max-w-md items-center gap-1 rounded-full border border-slate-200 bg-white/95 p-1.5 shadow-lg backdrop-blur sm:w-auto sm:max-w-none sm:gap-0 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-none">
+            {tabs.map(({ id, label, mobileLabel }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTab(id)}
+                aria-current={tab === id ? 'page' : undefined}
+                className={`flex-1 rounded-full px-3 py-2.5 text-xs font-medium sm:flex-none sm:rounded-none sm:px-6 sm:py-3 sm:text-sm ${
+                  tab === id
+                    ? 'bg-blue-800 text-white sm:border-b-2 sm:border-blue-800 sm:bg-transparent sm:text-blue-800'
+                    : 'text-slate-600 sm:text-slate-500'
+                }`}
+              >
+                {mobileLabel === label ? (
+                  label
+                ) : (
+                  <>
+                    <span className="sm:hidden">{mobileLabel}</span>
+                    <span className="hidden sm:inline">{label}</span>
+                  </>
+                )}
+              </button>
+            ))}
+          </div>
+        </nav>
 
         {tab === 'admin' && (
           <section aria-label="Admin" className="max-w-3xl">
