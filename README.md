@@ -4,7 +4,7 @@ Online admission for a school: first come, first served, with a seat held for a 
 time while the applicant pays.
 
 - Backend: .NET 8 minimal API, PostgreSQL 16, EF Core
-- Frontend: React 19, TypeScript, Vite, TanStack Query, served by nginx
+- Frontend: React 19, TypeScript, Vite, Tailwind, served by nginx
 - Everything runs with one `docker compose up`
 
 | | |
@@ -112,8 +112,8 @@ backend/
   tests/SchoolAdmission.Tests concurrency and rule tests
 frontend/
   src/api/                    fetch client and types
-  src/pages/                  class list, application, my applications
-  src/strings.ts              Bengali labels and error messages
+  src/App.tsx                 class list, application dialog, admin panel
+  src/styles.css              Tailwind entry
   nginx.conf                  static hosting and SPA fallback
 db/init/                      creates the test database on first start
 ```
