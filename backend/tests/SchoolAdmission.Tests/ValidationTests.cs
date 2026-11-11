@@ -79,19 +79,6 @@ public class ValidationTests : IClassFixture<AdmissionFactory>
     }
 
     [Fact]
-    public async Task Classes_can_share_a_name()
-    {
-        using var client = _factory.CreateClient();
-        var name = NewClassName("Class 6 - Morning Shift");
-
-        var first = await client.CreateClassAsync(name, 10);
-        var second = await client.CreateClassAsync(name, 10);
-
-        Assert.NotEqual(first.Id, second.Id);
-        Assert.Equal(name, second.Name);
-    }
-
-    [Fact]
     public async Task Student_hold_list_only_contains_their_own_applications()
     {
         using var client = _factory.CreateClient();

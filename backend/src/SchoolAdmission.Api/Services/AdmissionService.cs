@@ -74,6 +74,15 @@ public class AdmissionService
     {
         var (name, totalSeats) = ReadClassRequest(request);
 
+        var duplicate = await _db.Classes.AnyAsync(
+            existing => existing.Name.ToLower() == name.ToLower(),
+            cancellationToken);
+
+        if (duplicate)
+        {
+            throw ApiException.ClassExists(name);
+        }
+
         var now = await _db.NowAsync(cancellationToken);
 
         var entity = new ClassEntity
@@ -109,6 +118,15 @@ public class AdmissionService
         if (entity is null)
         {
             throw ApiException.ClassNotFound(classId);
+        }
+
+        var duplicate = await _db.Classes.AnyAsync(
+            existing => existing.Id != classId && existing.Name.ToLower() == name.ToLower(),
+            cancellationToken);
+
+        if (duplicate)
+        {
+            throw ApiException.ClassExists(name);
         }
 
         var now = await _db.NowAsync(cancellationToken);

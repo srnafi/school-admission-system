@@ -57,6 +57,37 @@ public class ClassAdminTests : IClassFixture<AdmissionFactory>
     }
 
     [Fact]
+    public async Task A_second_class_with_the_same_name_is_rejected()
+    {
+        using var client = _factory.CreateClient();
+        var name = NewClassName("Duplicate");
+        await client.CreateClassAsync(name, 5);
+
+        var response = await client.PostAsJsonAsync(
+            "/classes",
+            new { name = name.ToUpperInvariant(), totalSeats = 5 });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("CLASS_EXISTS", await response.ErrorCodeAsync());
+    }
+
+    [Fact]
+    public async Task Renaming_a_class_onto_an_existing_name_is_rejected()
+    {
+        using var client = _factory.CreateClient();
+        var takenName = NewClassName("Taken");
+        await client.CreateClassAsync(takenName, 5);
+        var other = await client.CreateClassAsync(NewClassName("Other"), 5);
+
+        var response = await client.PutAsJsonAsync(
+            $"/classes/{other.Id}",
+            new { name = takenName, totalSeats = 5 });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("CLASS_EXISTS", await response.ErrorCodeAsync());
+    }
+
+    [Fact]
     public async Task Updating_a_missing_class_returns_not_found()
     {
         using var client = _factory.CreateClient();

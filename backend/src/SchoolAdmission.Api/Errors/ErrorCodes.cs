@@ -5,6 +5,7 @@ public static class ErrorCodes
     public const string InvalidInput = "INVALID_INPUT";
     public const string InvalidStudentId = "INVALID_STUDENT_ID";
     public const string ClassNotFound = "CLASS_NOT_FOUND";
+    public const string ClassExists = "CLASS_EXISTS";
     public const string HoldNotFound = "HOLD_NOT_FOUND";
     public const string NoSeats = "NO_SEATS";
     public const string SeatsInUse = "SEATS_IN_USE";

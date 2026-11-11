@@ -21,6 +21,9 @@ public class ApiException : Exception
     public static ApiException ClassNotFound(string classId) =>
         new(StatusCodes.Status404NotFound, ErrorCodes.ClassNotFound, $"No class found with id {classId}.");
 
+    public static ApiException ClassExists(string name) =>
+        new(StatusCodes.Status409Conflict, ErrorCodes.ClassExists, $"A class named \"{name}\" already exists.");
+
     public static ApiException HoldNotFound(string holdId) =>
         new(StatusCodes.Status404NotFound, ErrorCodes.HoldNotFound, $"No application found with id {holdId}.");
 
