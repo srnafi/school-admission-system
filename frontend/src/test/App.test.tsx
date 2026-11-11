@@ -1,8 +1,19 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
+import { I18nProvider } from '../i18n/provider';
 
 const STUDENT_ID = '20152691234590001';
+
+function renderApp(locale: 'bn' | 'en' = 'en') {
+  localStorage.setItem('locale', locale);
+
+  return render(
+    <I18nProvider>
+      <App />
+    </I18nProvider>,
+  );
+}
 
 const classDto = {
   id: 'c1',
@@ -26,6 +37,89 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   localStorage.clear();
+  document.documentElement.lang = 'bn';
+});
+
+function stubEmptyDesk() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => json([])),
+  );
+}
+
+describe('localization', () => {
+  it('opens in Bangla when no language has been chosen', async () => {
+    stubEmptyDesk();
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    expect(await screen.findByText('চলমান ক্লাস')).toBeInTheDocument();
+    expect(screen.getByText('সব ক্লাস')).toBeInTheDocument();
+    expect(screen.getByLabelText('জন্ম নিবন্ধন নম্বর (বিআরএন)')).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe('bn');
+  });
+
+  it('switches the whole interface to English and remembers it', async () => {
+    stubEmptyDesk();
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    expect(await screen.findByText('চলমান ক্লাস')).toBeInTheDocument();
+    await screen.findByText('এখনও কোনো ক্লাস তৈরি হয়নি।');
+
+    fireEvent.click(screen.getByRole('button', { name: 'English' }));
+
+    expect(await screen.findByText('No classes have been created yet.')).toBeInTheDocument();
+    expect(screen.getByText('All Classes')).toBeInTheDocument();
+    expect(screen.getByLabelText('Birth Registration No. (BRN)')).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe('en');
+    expect(localStorage.getItem('locale')).toBe('en');
+
+    fireEvent.click(screen.getByRole('button', { name: 'বাংলা' }));
+
+    expect(await screen.findByText('এখনও কোনো ক্লাস তৈরি হয়নি।')).toBeInTheDocument();
+    expect(screen.getByText('সব ক্লাস')).toBeInTheDocument();
+  });
+
+  it('shows server errors in the chosen language', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+
+        if (url.endsWith('/classes')) {
+          return json([{ ...classDto }]);
+        }
+
+        if (url.includes('/holds') && (init?.method ?? 'GET') === 'POST') {
+          return json({ error: { code: 'NO_SEATS', message: 'no seats' } }, 409);
+        }
+
+        return json([]);
+      }),
+    );
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    fireEvent.change(screen.getByLabelText('জন্ম নিবন্ধন নম্বর (বিআরএন)'), {
+      target: { value: STUDENT_ID },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'আবেদন করুন' }));
+
+    expect(await screen.findByText('এই ক্লাসে আর আসন নেই।')).toBeInTheDocument();
+  });
 });
 
 describe('admission desk', () => {
@@ -82,7 +176,7 @@ describe('admission desk', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByText('Class 6 - Morning Shift')).toBeInTheDocument();
 
@@ -121,7 +215,7 @@ describe('admission desk', () => {
       }),
     );
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByRole('button', { name: 'Class Full' })).toBeDisabled();
   });
@@ -152,7 +246,7 @@ describe('admission desk', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
-    render(<App />);
+    renderApp();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Admin' }));
 
@@ -203,7 +297,7 @@ describe('admission desk', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
-    render(<App />);
+    renderApp();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Admin' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add a custom class instead' }));
@@ -232,7 +326,7 @@ describe('admission desk', () => {
       }),
     );
 
-    render(<App />);
+    renderApp();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Admin' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add a custom class instead' }));
@@ -276,7 +370,7 @@ describe('admission desk', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
-    render(<App />);
+    renderApp();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Admin' }));
     fireEvent.click(screen.getByRole('button', { name: 'Class: Class 6' }));
@@ -328,7 +422,7 @@ describe('admission desk', () => {
       }),
     );
 
-    render(<App />);
+    renderApp();
 
     fireEvent.change(screen.getByLabelText('Birth Registration No. (BRN)'), {
       target: { value: STUDENT_ID },

@@ -29,6 +29,17 @@ a class with a seat count, then press the apply button on that class.
 To stop: `docker compose down`. To stop and delete the database: `docker compose down -v`.
 Data survives a plain `down` and `up`, because it lives in the `pgdata` volume.
 
+### Language
+
+The interface ships in Bengali and English. Bengali is the default; the switch sits in the
+masthead and the choice is kept in `localStorage` under `locale`. There is no language in the
+URL, so a shared link opens in Bengali.
+
+Every string lives in `frontend/src/i18n/messages.bn.ts`, and `messages.en.ts` must supply the
+same keys — the compiler fails if either catalog grows a key the other lacks. Server error
+codes map to `error.<CODE>` keys, so a new backend error needs one entry per catalog and
+nothing else.
+
 ### Configuration
 
 | Variable | Where | Default | Meaning |
@@ -112,8 +123,9 @@ backend/
   tests/SchoolAdmission.Tests concurrency and rule tests
 frontend/
   src/api/                    fetch client and types
+  src/i18n/                   Bangla and English catalogs, locale provider
   src/App.tsx                 class list, application dialog, admin panel
-  src/styles.css              Tailwind entry
+  src/styles.css              Tailwind entry, font stacks, tabular figures
   nginx.conf                  static hosting and SPA fallback
 db/init/                      creates the test database on first start
 ```

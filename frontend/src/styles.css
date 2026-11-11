@@ -2,9 +2,31 @@
 
 :root {
   color-scheme: light;
+  --font-latin:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+  --font-bengali:
+    "Nirmala UI", "Noto Sans Bengali", "Noto Sans Bangla", "Bangla Sangam MN", "Vrinda",
+    "Shonar Bangla", "Kalpurush", "SolaimanLipi";
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-family: var(--font-latin);
+  line-height: 1.5;
+}
+
+/* Bengali needs the taller line box: stacked matras and descenders clip at 1.5. */
+:lang(bn) {
+  font-family: var(--font-bengali), var(--font-latin);
+  line-height: 1.65;
+}
+
+/* Figures that change in place keep one digit width. */
+.font-mono {
+  font-variant-numeric: tabular-nums;
 }

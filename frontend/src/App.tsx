@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { CheckCircle, ChevronDown, Clock, Info, Users, X, XCircle } from 'lucide-react';
 import { api, ApiError } from './api/client';
 import type { ClassDto, HoldSummaryDto } from './api/types';
+import { LanguageSwitch } from './components/LanguageSwitch';
+import { errorKey, type MessageKey, type Translate } from './i18n/catalog';
+import { useI18n } from './i18n/useI18n';
 
 const ID_LENGTH = 17;
 
@@ -16,39 +19,28 @@ function isCompleteId(value: string): boolean {
   return value.length === ID_LENGTH;
 }
 
-function describeError(err: unknown): string {
+function describeError(err: unknown, t: Translate): string {
   if (err instanceof ApiError) {
     switch (err.code) {
       case 'NO_SEATS':
-        return 'This class is full. No seats are available.';
       case 'ALREADY_APPLIED':
-        return 'You already have an active application for this class.';
       case 'INVALID_STUDENT_ID':
-        return 'Enter a valid 17-digit Birth Registration Number.';
       case 'CLASS_NOT_FOUND':
-        return 'This class no longer exists.';
       case 'HOLD_NOT_FOUND':
-        return 'This application no longer exists.';
       case 'HOLD_EXPIRED':
-        return 'This hold has expired.';
       case 'HOLD_NOT_ACTIVE':
-        return 'This application can no longer be changed.';
       case 'FORBIDDEN':
-        return 'This application belongs to another student.';
       case 'NETWORK_ERROR':
-        return 'The admission server could not be reached.';
       case 'INVALID_INPUT':
-        return 'Check the class name and seat count.';
       case 'CLASS_EXISTS':
-        return 'A class with that name already exists.';
       case 'SEATS_IN_USE':
-        return 'Seats cannot go below the seats already taken.';
+        return t(errorKey(err.code));
       default:
-        return err.message || 'Something went wrong. Try again.';
+        return t('error.generic');
     }
   }
 
-  return 'Something went wrong. Try again.';
+  return t('error.generic');
 }
 
 function countdown(expiresAt: string, now: number): { label: string; expired: boolean } {
@@ -68,14 +60,21 @@ const statusTone: Record<string, string> = {
   CANCELLED: 'bg-slate-200 text-slate-600',
 };
 
-const tabs: { id: Tab; label: string; mobileLabel: string }[] = [
-  { id: 'classes', label: 'Available Classes', mobileLabel: 'Classes' },
-  { id: 'myapps', label: 'My Applications', mobileLabel: 'My Applications' },
-  { id: 'admin', label: 'Admin', mobileLabel: 'Admin' },
+const tabs: { id: Tab; labelKey: MessageKey; shortLabelKey: MessageKey }[] = [
+  { id: 'classes', labelKey: 'tab.classes', shortLabelKey: 'tab.classesShort' },
+  { id: 'myapps', labelKey: 'tab.myapps', shortLabelKey: 'tab.myapps' },
+  { id: 'admin', labelKey: 'tab.admin', shortLabelKey: 'tab.admin' },
 ];
 
 const classNumbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
-const shifts = ['Morning', 'Day'];
+const shiftOptions: { value: string; labelKey: MessageKey }[] = [
+  { value: 'Morning', labelKey: 'admin.shiftMorning' },
+  { value: 'Day', labelKey: 'admin.shiftDay' },
+];
+
+function classNumberLabel(number: string, t: Translate): string {
+  return t('admin.classOption', { n: number });
+}
 
 interface SelectMenuProps {
   label: string;
@@ -210,6 +209,7 @@ const toastTone: Record<ToastTone, { box: string; icon: typeof CheckCircle; icon
 function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number) => void }) {
   const tone = toastTone[toast.tone];
   const Icon = tone.icon;
+  const { t } = useI18n();
 
   return (
     <div
@@ -221,7 +221,7 @@ function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number)
       <button
         type="button"
         onClick={() => onDismiss(toast.id)}
-        aria-label="Dismiss notification"
+        aria-label={t('toast.dismiss')}
         className="rounded p-0.5 opacity-60 hover:opacity-100"
       >
         <X className="h-4 w-4" />
@@ -231,6 +231,7 @@ function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number)
 }
 
 export default function App() {
+  const { t } = useI18n();
   const [studentId, setStudentId] = useState(() => sanitizeId(localStorage.getItem('studentId') ?? ''));
   const [classes, setClasses] = useState<ClassDto[]>([]);
   const [myHolds, setMyHolds] = useState<HoldSummaryDto[]>([]);
@@ -307,10 +308,10 @@ export default function App() {
     } catch (err) {
       if (err instanceof ApiError && err.code === 'NETWORK_ERROR' && !offline.current) {
         offline.current = true;
-        pushToast('warning', "Can't reach the admission server. Retrying.");
+        pushToast('warning', t('toast.offline'));
       }
     }
-  }, [pushToast]);
+  }, [pushToast, t]);
 
   const loadHolds = useCallback(async (id: string) => {
     if (!isCompleteId(id)) {
@@ -376,12 +377,12 @@ export default function App() {
     const seats = Number(newSeatCount);
 
     if (!name || !Number.isInteger(seats) || seats < 1) {
-      pushToast('error', 'Enter a class name and a seat count of at least 1.');
+      pushToast('error', t('toast.classNameRequired'));
       return;
     }
 
     if (customMatch) {
-      pushToast('error', `Class "${name}" already exists. Use the pickers above to update it.`);
+      pushToast('error', t('toast.duplicateClass', { name }));
       return;
     }
 
@@ -393,9 +394,9 @@ export default function App() {
       setNewClassName('');
       setNewSeatCount('100');
       setTab('classes');
-      pushToast('success', `Class "${name}" created.`);
+      pushToast('success', t('toast.classCreated', { name }));
     } catch (err) {
-      pushToast('error', describeError(err));
+      pushToast('error', describeError(err, t));
     } finally {
       setSaving(false);
     }
@@ -406,12 +407,12 @@ export default function App() {
 
     const seats = Number(presetSeatsValue);
     if (!Number.isInteger(seats) || seats < 1) {
-      pushToast('error', 'Enter a seat count of at least 1.');
+      pushToast('error', t('toast.seatsMin'));
       return;
     }
 
     if (presetMatch && seats < presetTaken) {
-      pushToast('error', `Seats cannot go below the ${presetTaken} already taken.`);
+      pushToast('error', t('toast.seatsBelow', { taken: presetTaken }));
       return;
     }
 
@@ -422,22 +423,23 @@ export default function App() {
         await api.updateClass(presetMatch.id, presetName, seats);
         await loadClasses();
         setTab('classes');
-        pushToast('success', `Class "${presetName}" updated.`);
+        pushToast('success', t('toast.classUpdated', { name: presetName }));
       } else {
         await api.createClass(presetName, seats);
         await loadClasses();
         setTab('classes');
-        pushToast('success', `Class "${presetName}" created.`);
+        pushToast('success', t('toast.classCreated', { name: presetName }));
       }
     } catch (err) {
-      pushToast('error', describeError(err));
+      pushToast('error', describeError(err, t));
     } finally {
       setSaving(false);
     }
   };
 
-  const applyForSeat = async (item: ClassDto) => {    if (!validStudent) {
-      pushToast('error', 'Enter your 17-digit Birth Registration Number before applying.');
+  const applyForSeat = async (item: ClassDto) => {
+    if (!validStudent) {
+      pushToast('error', t('toast.enterBrn'));
       return;
     }
 
@@ -449,9 +451,9 @@ export default function App() {
       setSelection({ kind: 'hold', holdId: hold.holdId });
       setNow(Date.now());
       setTab('myapps');
-      pushToast('success', 'Seat held. Pay before the hold expires to confirm your admission.');
+      pushToast('success', t('toast.seatHeld'));
     } catch (err) {
-      pushToast('error', describeError(err));
+      pushToast('error', describeError(err, t));
     } finally {
       setBusy(false);
     }
@@ -463,9 +465,9 @@ export default function App() {
     try {
       await api.confirmHold(holdIdToConfirm, studentId);
       await Promise.all([loadHolds(studentId), loadClasses()]);
-      pushToast('success', 'Payment recorded. Your admission is confirmed.');
+      pushToast('success', t('toast.payment'));
     } catch (err) {
-      pushToast('error', describeError(err));
+      pushToast('error', describeError(err, t));
       await loadHolds(studentId);
     } finally {
       setBusy(false);
@@ -479,9 +481,9 @@ export default function App() {
       await api.cancelHold(holdIdToCancel, studentId);
       await Promise.all([loadHolds(studentId), loadClasses()]);
       setSelection(null);
-      pushToast('success', 'Application cancelled. The seat is available again.');
+      pushToast('success', t('toast.cancelled'));
     } catch (err) {
-      pushToast('error', describeError(err));
+      pushToast('error', describeError(err, t));
     } finally {
       setBusy(false);
     }
@@ -504,11 +506,10 @@ export default function App() {
               S
             </div>
             <div>
-              <div className="text-xl font-semibold">School Admission System</div>
-              <div className="text-xs text-slate-500">
-                Onnorokom Prajukti Limited — First Come, First Served
-              </div>
+              <div className="text-xl font-semibold">{t('app.title')}</div>
+              <div className="text-xs text-slate-500">{t('app.subtitle')}</div>
             </div>
+            <LanguageSwitch className="ml-1 shrink-0" />
           </div>
 
           <div className="mt-4 flex w-full flex-col gap-1.5 sm:mt-0 sm:w-auto">
@@ -516,7 +517,7 @@ export default function App() {
               htmlFor="student-id"
               className="text-[11px] font-semibold uppercase tracking-wide text-slate-500"
             >
-              Birth Registration No. (BRN)
+              {t('id.label')}
             </label>
             <div
               className={`flex items-center gap-2 rounded-xl border bg-white px-4 py-2.5 transition-colors focus-within:border-blue-700 ${
@@ -532,8 +533,9 @@ export default function App() {
                 spellCheck={false}
                 maxLength={ID_LENGTH}
                 value={studentId}
+                aria-label={t('id.aria')}
                 onChange={(event) => handleIdChange(event.currentTarget.value)}
-                placeholder="17-digit number"
+                placeholder={t('id.placeholder')}
                 className="w-full min-w-0 bg-transparent font-mono text-base outline-none placeholder:text-slate-400 sm:w-64"
               />
               <span
@@ -545,7 +547,7 @@ export default function App() {
               </span>
             </div>
             {studentId.length > 0 && !validStudent && (
-              <span className="text-xs text-red-500">Enter all 17 digits.</span>
+              <span className="text-xs text-red-500">{t('id.incomplete')}</span>
             )}
           </div>
         </div>
@@ -553,42 +555,51 @@ export default function App() {
 
       <main className="mx-auto max-w-6xl px-4 pb-28 pt-6 sm:px-6 sm:pb-8 sm:pt-8">
         <nav
-          aria-label="Sections"
+          aria-label={t('nav.sections')}
           className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-4 sm:static sm:mb-6 sm:justify-start sm:border-b sm:px-0 sm:pb-0"
         >
           <div className="flex w-full max-w-md items-center gap-1 rounded-2xl border border-slate-200 bg-white/95 p-1.5 shadow-lg backdrop-blur sm:w-auto sm:max-w-none sm:gap-0 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-none">
-            {tabs.map(({ id, label, mobileLabel }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setTab(id)}
-                aria-current={tab === id ? 'page' : undefined}
-                className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-medium transition-colors duration-200 ease-in sm:flex-none sm:rounded-none sm:px-6 sm:py-3 sm:text-sm ${
-                  tab === id
-                    ? 'bg-blue-800 text-white sm:border-b-2 sm:border-blue-800 sm:bg-transparent sm:text-blue-800'
-                    : 'text-slate-600 sm:text-slate-500'
-                }`}
-              >
-                {mobileLabel === label ? (
-                  label
-                ) : (
-                  <>
-                    <span className="sm:hidden">{mobileLabel}</span>
-                    <span className="hidden sm:inline">{label}</span>
-                  </>
-                )}
-              </button>
-            ))}
+            {tabs.map(({ id, labelKey, shortLabelKey }) => {
+              const label = t(labelKey);
+              const shortLabel = t(shortLabelKey);
+
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setTab(id)}
+                  aria-current={tab === id ? 'page' : undefined}
+                  className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-medium transition-colors duration-200 ease-in sm:flex-none sm:rounded-none sm:px-6 sm:py-3 sm:text-sm ${
+                    tab === id
+                      ? 'bg-blue-800 text-white sm:border-b-2 sm:border-blue-800 sm:bg-transparent sm:text-blue-800'
+                      : 'text-slate-600 sm:text-slate-500'
+                  }`}
+                >
+                  {shortLabel === label ? (
+                    label
+                  ) : (
+                    <>
+                      <span className="sm:hidden">{shortLabel}</span>
+                      <span className="hidden sm:inline">{label}</span>
+                    </>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </nav>
 
         {tab === 'admin' && (
-          <section aria-label="Admin" className="max-w-3xl">
-            <h2 className="text-lg font-semibold">Add a class</h2>
+          <section aria-label={t('tab.admin')} className="max-w-3xl">
+            <h2 className="text-lg font-semibold">{t('admin.title')}</h2>
             <p className="mb-4 text-sm text-slate-600">
               {presetMatch
-                ? `${presetName} already exists with ${presetMatch.totalSeats} seats, ${presetTaken} already taken. Saving updates it.`
-                : 'Pick a class and shift, then set the seat count.'}
+                ? t('admin.noteExisting', {
+                    name: presetName,
+                    total: presetMatch.totalSeats,
+                    taken: presetTaken,
+                  })
+                : t('admin.noteNew')}
             </p>
 
             <form
@@ -596,25 +607,31 @@ export default function App() {
               className="grid gap-4 rounded-2xl border bg-white p-6 sm:grid-cols-[140px_150px_1fr_auto]"
             >
               <SelectMenu
-                label="Class"
+                label={t('admin.class')}
                 value={presetClassNo}
-                options={classNumbers.map((number) => ({ value: number, label: `Class ${number}` }))}
+                options={classNumbers.map((number) => ({
+                  value: number,
+                  label: classNumberLabel(number, t),
+                }))}
                 onChange={(value) => {
                   setPresetClassNo(value);
                   setPresetSeats(null);
                 }}
               />
               <SelectMenu
-                label="Shift"
+                label={t('admin.shift')}
                 value={presetShift}
-                options={shifts.map((shift) => ({ value: shift, label: shift }))}
+                options={shiftOptions.map((option) => ({
+                  value: option.value,
+                  label: t(option.labelKey),
+                }))}
                 onChange={(value) => {
                   setPresetShift(value);
                   setPresetSeats(null);
                 }}
               />
               <label className="flex flex-col gap-1 text-sm">
-                <span className="text-xs font-medium text-slate-500">Seats</span>
+                <span className="text-xs font-medium text-slate-500">{t('admin.seats')}</span>
                 <input
                   type="number"
                   min={Math.max(1, presetTaken)}
@@ -629,7 +646,11 @@ export default function App() {
                   disabled={saving}
                   className="w-full rounded-xl bg-blue-800 px-6 py-3 text-white hover:bg-blue-900 disabled:bg-slate-300"
                 >
-                  {saving ? 'Saving…' : presetMatch ? 'Update class' : 'Create class'}
+                  {saving
+                    ? t('admin.saving')
+                    : presetMatch
+                      ? t('admin.update')
+                      : t('admin.create')}
                 </button>
               </div>
             </form>
@@ -641,7 +662,7 @@ export default function App() {
                 aria-expanded={customOpen}
                 className="text-xs text-slate-400 underline underline-offset-2 hover:text-slate-600"
               >
-                {customOpen ? 'Hide custom class form' : 'Add a custom class instead'}
+                {customOpen ? t('admin.hideCustom') : t('admin.showCustom')}
               </button>
 
               {customOpen && (
@@ -654,19 +675,19 @@ export default function App() {
                       htmlFor="custom-class-name"
                       className="text-xs font-medium text-slate-500"
                     >
-                      Class name
+                      {t('admin.customName')}
                     </label>
                     <input
                       id="custom-class-name"
                       value={newClassName}
                       onChange={(event) => setNewClassName(event.currentTarget.value)}
-                      placeholder="Class 8 - Evening Shift"
+                      placeholder={t('admin.customPlaceholder')}
                       maxLength={200}
                       className="rounded-xl border bg-white px-3 py-2"
                     />
                   </div>
                   <label className="flex flex-col gap-1 text-sm">
-                    <span className="text-xs font-medium text-slate-500">Total seats</span>
+                    <span className="text-xs font-medium text-slate-500">{t('admin.totalSeats')}</span>
                     <input
                       type="number"
                       min={1}
@@ -681,14 +702,12 @@ export default function App() {
                       disabled={saving || !newClassName.trim() || Boolean(customMatch)}
                       className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 disabled:text-slate-400"
                     >
-                      {saving ? 'Creating…' : 'Create custom class'}
+                      {saving ? t('admin.creating') : t('admin.createCustom')}
                     </button>
                   </div>
 
                   {customMatch && (
-                    <p className="text-xs text-amber-700 sm:col-span-3">
-                      This class already exists. Update it with the pickers above.
-                    </p>
+                    <p className="text-xs text-amber-700 sm:col-span-3">{t('admin.duplicate')}</p>
                   )}
                 </form>
               )}
@@ -697,12 +716,12 @@ export default function App() {
         )}
 
         {tab === 'classes' && (
-          <section aria-label="Available classes">
-            <div className="mb-4 font-medium">All Classes</div>
+          <section aria-label={t('tab.classes')}>
+            <div className="mb-4 font-medium">{t('classes.all')}</div>
 
             {classes.length === 0 ? (
               <div className="rounded-2xl border bg-white px-6 py-16 text-center text-slate-500">
-                No classes have been created yet.
+                {t('classes.empty')}
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -721,24 +740,26 @@ export default function App() {
                                 : 'bg-amber-100 text-amber-800'
                             }`}
                           >
-                            Already applied
+                            {t('classes.alreadyApplied')}
                           </span>
                         )}
                       </div>
-                      <div className="mb-4 text-xs text-slate-500">Total Seats: {item.totalSeats}</div>
+                      <div className="mb-4 text-xs text-slate-500">
+                        {t('classes.total', { count: item.totalSeats })}
+                      </div>
 
                       <div className="mb-6 grid grid-cols-3 gap-2 text-center text-sm">
                         <div>
                           <div className="font-mono text-2xl font-semibold text-emerald-600">{item.availableSeats}</div>
-                          <div className="text-[10px] text-slate-500">AVAILABLE</div>
+                          <div className="text-[10px] text-slate-500">{t('classes.available')}</div>
                         </div>
                         <div>
                           <div className="font-mono text-2xl font-semibold text-amber-600">{item.heldSeats}</div>
-                          <div className="text-[10px] text-slate-500">HELD</div>
+                          <div className="text-[10px] text-slate-500">{t('classes.held')}</div>
                         </div>
                         <div>
                           <div className="font-mono text-2xl font-semibold text-blue-600">{item.confirmedSeats}</div>
-                          <div className="text-[10px] text-slate-500">CONFIRMED</div>
+                          <div className="text-[10px] text-slate-500">{t('classes.confirmed')}</div>
                         </div>
                       </div>
 
@@ -748,7 +769,7 @@ export default function App() {
                           onClick={() => setSelection({ kind: 'class', classId: item.id })}
                           className="flex-1 rounded-xl border py-2 text-sm hover:bg-slate-50"
                         >
-                          View Details
+                          {t('classes.viewDetails')}
                         </button>
                         {activeHold ? (
                           <button
@@ -756,7 +777,7 @@ export default function App() {
                             onClick={() => openHold(activeHold)}
                             className="flex-1 rounded-xl border py-2 text-sm text-blue-700 hover:bg-slate-50"
                           >
-                            View application
+                            {t('classes.viewApplication')}
                           </button>
                         ) : (
                           <button
@@ -765,7 +786,9 @@ export default function App() {
                             disabled={applyDisabled || item.availableSeats === 0}
                             className="flex-1 rounded-xl bg-blue-800 py-2 text-sm text-white hover:bg-blue-900 disabled:bg-slate-300"
                           >
-                            {item.availableSeats === 0 ? 'Class Full' : 'Apply Now'}
+                            {item.availableSeats === 0
+                              ? t('classes.classFull')
+                              : t('classes.applyNow')}
                           </button>
                         )}
                       </div>
@@ -778,13 +801,11 @@ export default function App() {
         )}
 
         {tab === 'myapps' && (
-          <section aria-label="My applications">
+          <section aria-label={t('tab.myapps')}>
             {!validStudent ? (
-              <div className="py-16 text-center text-slate-500">
-                Enter your 17-digit Birth Registration Number to view your applications.
-              </div>
+              <div className="py-16 text-center text-slate-500">{t('myapps.noId')}</div>
             ) : myHolds.length === 0 ? (
-              <div className="py-16 text-center text-slate-500">You have no applications yet.</div>
+              <div className="py-16 text-center text-slate-500">{t('myapps.empty')}</div>
             ) : (
               <ul className="space-y-3">
                 {myHolds.map((hold) => (
@@ -796,7 +817,9 @@ export default function App() {
                     >
                       <div>
                         <div className="font-medium">{hold.className}</div>
-                        <div className="text-sm text-slate-500">Hold ID: {hold.holdId}</div>
+                        <div className="text-sm text-slate-500">
+                          {t('myapps.holdId', { id: hold.holdId })}
+                        </div>
                       </div>
                       <div className="flex items-center gap-6 text-sm">
                         <span
@@ -804,7 +827,7 @@ export default function App() {
                             statusTone[hold.status] ?? 'bg-slate-200 text-slate-600'
                           }`}
                         >
-                          {hold.status}
+                          {t(`status.${hold.status}`)}
                         </span>
                         {hold.status === 'HELD' && (
                           <span className="flex items-center gap-1 font-mono text-amber-600">
@@ -812,7 +835,7 @@ export default function App() {
                             {new Date(hold.expiresAt).toLocaleTimeString()}
                           </span>
                         )}
-                        <span className="text-xs text-blue-700">View →</span>
+                        <span className="text-xs text-blue-700">{t('myapps.view')} →</span>
                       </div>
                     </button>
                   </li>
@@ -831,23 +854,23 @@ export default function App() {
           <div
             role="dialog"
             aria-modal="true"
-            aria-label={selectedClass ? selectedClass.name : 'Application status'}
+            aria-label={selectedClass ? selectedClass.name : t('dialog.applicationStatus')}
             className="w-full max-w-md rounded-3xl bg-white p-8"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
                 <div className="text-2xl font-semibold">
-                  {selectedClass ? selectedClass.name : 'Application Status'}
+                  {selectedClass ? selectedClass.name : t('dialog.applicationStatus')}
                 </div>
                 <div className="text-sm text-slate-500">
-                  {selectedClass ? 'Seat Status' : selectedHold?.className}
+                  {selectedClass ? t('dialog.seatStatus') : selectedHold?.className}
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setSelection(null)}
-                aria-label="Close"
+                aria-label={t('dialog.close')}
                 className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
               >
                 <X className="h-5 w-5" />
@@ -857,13 +880,13 @@ export default function App() {
             {selectedClass && (
               <>
                 <div className="mb-8 grid grid-cols-2 gap-y-4 text-sm">
-                  <div>Total Seats</div>
+                  <div>{t('admin.totalSeats')}</div>
                   <div className="text-right font-mono">{selectedClass.totalSeats}</div>
-                  <div>Available</div>
+                  <div>{t('classes.available')}</div>
                   <div className="text-right font-mono text-emerald-600">{selectedClass.availableSeats}</div>
-                  <div>Held</div>
+                  <div>{t('classes.held')}</div>
                   <div className="text-right font-mono text-amber-600">{selectedClass.heldSeats}</div>
-                  <div>Confirmed</div>
+                  <div>{t('classes.confirmed')}</div>
                   <div className="text-right font-mono text-blue-600">{selectedClass.confirmedSeats}</div>
                 </div>
 
@@ -873,7 +896,7 @@ export default function App() {
                     onClick={() => openHold(selectedClassHold)}
                     className="w-full rounded-2xl border py-3 text-blue-700 hover:bg-slate-50"
                   >
-                    Already applied — view application
+                    {t('dialog.alreadyAppliedView')}
                   </button>
                 ) : (
                   <button
@@ -882,7 +905,9 @@ export default function App() {
                     disabled={applyDisabled || selectedClass.availableSeats === 0}
                     className="w-full rounded-2xl bg-blue-800 py-3 text-white hover:bg-blue-900 disabled:bg-slate-300"
                   >
-                    {selectedClass.availableSeats === 0 ? 'Class Full' : 'Apply for this Class'}
+                    {selectedClass.availableSeats === 0
+                      ? t('classes.classFull')
+                      : t('dialog.applyForClass')}
                   </button>
                 )}
               </>
@@ -892,19 +917,21 @@ export default function App() {
               <>
                 <div className="mb-8 space-y-4">
                   <div className="flex justify-between">
-                    <span>Status</span>
-                    <span className="font-mono text-lg font-semibold">{selectedHold.status}</span>
+                    <span>{t('dialog.status')}</span>
+                    <span className="font-mono text-lg font-semibold">
+                      {t(`status.${selectedHold.status}`)}
+                    </span>
                   </div>
                   {selectedHold.status === 'HELD' && holdClock && (
                     <div className="flex justify-between text-amber-600">
-                      <span>Expires in</span>
+                      <span>{t('dialog.expiresIn')}</span>
                       <span className="font-mono text-2xl font-semibold tracking-tight">
-                        {holdClock.expired ? 'Expired' : holdClock.label}
+                        {holdClock.expired ? t('dialog.expired') : holdClock.label}
                       </span>
                     </div>
                   )}
                   <div className="flex justify-between text-xs text-slate-500">
-                    <span>Expires At</span>
+                    <span>{t('dialog.expiresAt')}</span>
                     <span>{new Date(selectedHold.expiresAt).toLocaleString()}</span>
                   </div>
                 </div>
@@ -917,7 +944,7 @@ export default function App() {
                       disabled={busy || Boolean(holdClock?.expired)}
                       className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-3 text-white hover:bg-emerald-700 disabled:bg-slate-300"
                     >
-                      <CheckCircle className="h-4 w-4" /> Pay Admission Fee &amp; Confirm
+                      <CheckCircle className="h-4 w-4" /> {t('dialog.pay')}
                     </button>
                     <button
                       type="button"
@@ -925,14 +952,14 @@ export default function App() {
                       disabled={busy}
                       className="flex w-full items-center justify-center gap-2 rounded-2xl border py-3 text-red-600 hover:bg-red-50 disabled:text-slate-400"
                     >
-                      <XCircle className="h-4 w-4" /> Cancel Application
+                      <XCircle className="h-4 w-4" /> {t('dialog.cancel')}
                     </button>
                   </div>
                 )}
 
                 {selectedHold.status === 'CONFIRMED' && (
                   <div className="py-3 text-center text-emerald-700">
-                    Admission confirmed
+                    {t('dialog.confirmedMsg')}
                     <svg
                       viewBox="0 0 140 12"
                       className="mx-auto mt-1 block h-3 w-36 text-emerald-600"
@@ -949,10 +976,10 @@ export default function App() {
                   </div>
                 )}
                 {selectedHold.status === 'EXPIRED' && (
-                  <div className="py-3 text-center text-red-600">This hold has expired</div>
+                  <div className="py-3 text-center text-red-600">{t('dialog.expiredMsg')}</div>
                 )}
                 {selectedHold.status === 'CANCELLED' && (
-                  <div className="py-3 text-center text-slate-500">This application was cancelled</div>
+                  <div className="py-3 text-center text-slate-500">{t('dialog.cancelledMsg')}</div>
                 )}
               </>
             )}
