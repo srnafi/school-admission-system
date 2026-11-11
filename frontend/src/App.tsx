@@ -221,7 +221,7 @@ export default function App() {
       setSelection({ kind: 'hold', holdId: hold.holdId });
       setNow(Date.now());
       setTab('myapps');
-      setNotice('Seat held. Pay within 10 minutes to confirm your admission.');
+      setNotice('Seat held. Pay before the hold expires to confirm your admission.');
     } catch (err) {
       setError(describeError(err));
     } finally {
@@ -371,7 +371,7 @@ export default function App() {
                 value={newClassName}
                 onChange={(event) => setNewClassName(event.currentTarget.value)}
                 placeholder="Class 8 - Morning Shift"
-                maxLength={120}
+                maxLength={200}
                 className="rounded-xl border px-4 py-3"
               />
             </label>
@@ -380,7 +380,6 @@ export default function App() {
               <input
                 type="number"
                 min={1}
-                max={10000}
                 value={newSeatCount}
                 onChange={(event) => setNewSeatCount(event.currentTarget.value)}
                 className="rounded-xl border px-4 py-3 font-mono"
