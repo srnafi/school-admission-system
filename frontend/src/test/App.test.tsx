@@ -253,8 +253,10 @@ describe('admission desk', () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Admin' }));
-    fireEvent.change(screen.getByLabelText('Class'), { target: { value: '8' } });
-    fireEvent.change(screen.getByLabelText('Shift'), { target: { value: 'Day' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Class: Class 6' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Class 8' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Shift: Morning' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Day' }));
     fireEvent.change(screen.getByLabelText('Seats'), { target: { value: '35' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create class' }));
 

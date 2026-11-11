@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { CheckCircle, Clock, Info, RefreshCw, Users, X, XCircle } from 'lucide-react';
+import { CheckCircle, ChevronDown, Clock, Info, RefreshCw, Users, X, XCircle } from 'lucide-react';
 import { api, ApiError } from './api/client';
 import type { ClassDto, HoldSummaryDto } from './api/types';
 
@@ -74,6 +74,95 @@ const tabs: { id: Tab; label: string }[] = [
 
 const classNumbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
 const shifts = ['Morning', 'Day'];
+
+interface SelectMenuProps {
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+}
+
+function SelectMenu({ label, value, options, onChange }: SelectMenuProps) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (root.current && !root.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+        trigger.current?.focus();
+      }
+    };
+
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
+  const selected = options.find((option) => option.value === value);
+
+  return (
+    <div ref={root} className="relative flex flex-col gap-1 text-sm">
+      <span className="text-xs font-medium text-slate-500">{label}</span>
+      <button
+        ref={trigger}
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`${label}: ${selected?.label ?? value}`}
+        onClick={() => setOpen((current) => !current)}
+        className="flex w-full items-center justify-between gap-2 rounded-xl border bg-white px-3 py-3 text-left"
+      >
+        <span>{selected?.label ?? value}</span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          aria-label={label}
+          className="absolute inset-x-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+        >
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="option"
+              aria-selected={option.value === value}
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+                trigger.current?.focus();
+              }}
+              className={`block w-full px-3 py-2 text-left text-sm hover:bg-slate-100 ${
+                option.value === value ? 'bg-blue-50 font-medium text-blue-800' : ''
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const classNameOrder = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
@@ -472,40 +561,24 @@ export default function App() {
               onSubmit={(event) => void savePresetClass(event)}
               className="grid gap-4 rounded-2xl border bg-white p-6 sm:grid-cols-[140px_150px_1fr_auto]"
             >
-              <label className="flex flex-col gap-1 text-sm">
-                <span className="text-xs font-medium text-slate-500">Class</span>
-                <select
-                  value={presetClassNo}
-                  onChange={(event) => {
-                    setPresetClassNo(event.currentTarget.value);
-                    setPresetSeats(null);
-                  }}
-                  className="rounded-xl border bg-white px-3 py-3"
-                >
-                  {classNumbers.map((number) => (
-                    <option key={number} value={number}>
-                      Class {number}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-1 text-sm">
-                <span className="text-xs font-medium text-slate-500">Shift</span>
-                <select
-                  value={presetShift}
-                  onChange={(event) => {
-                    setPresetShift(event.currentTarget.value);
-                    setPresetSeats(null);
-                  }}
-                  className="rounded-xl border bg-white px-3 py-3"
-                >
-                  {shifts.map((shift) => (
-                    <option key={shift} value={shift}>
-                      {shift}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <SelectMenu
+                label="Class"
+                value={presetClassNo}
+                options={classNumbers.map((number) => ({ value: number, label: `Class ${number}` }))}
+                onChange={(value) => {
+                  setPresetClassNo(value);
+                  setPresetSeats(null);
+                }}
+              />
+              <SelectMenu
+                label="Shift"
+                value={presetShift}
+                options={shifts.map((shift) => ({ value: shift, label: shift }))}
+                onChange={(value) => {
+                  setPresetShift(value);
+                  setPresetSeats(null);
+                }}
+              />
               <label className="flex flex-col gap-1 text-sm">
                 <span className="text-xs font-medium text-slate-500">Seats</span>
                 <input
