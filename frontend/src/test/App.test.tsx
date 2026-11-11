@@ -220,6 +220,32 @@ describe('admission desk', () => {
     );
   });
 
+  it('warns instead of creating a class whose name already exists', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).endsWith('/classes')) {
+          return json([{ ...classDto }]);
+        }
+
+        return json([]);
+      }),
+    );
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Admin' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add a custom class instead' }));
+    fireEvent.change(screen.getByLabelText('Class name'), {
+      target: { value: 'class 6 - morning shift' },
+    });
+
+    expect(
+      await screen.findByText('This class already exists. Update it with the pickers above.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create custom class' })).toBeDisabled();
+  });
+
   it('creates a class from the class and shift pickers', async () => {
     const classes: (typeof classDto)[] = [];
 

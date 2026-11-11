@@ -39,6 +39,8 @@ function describeError(err: unknown): string {
         return 'The admission server could not be reached.';
       case 'INVALID_INPUT':
         return 'Check the class name and seat count.';
+      case 'CLASS_EXISTS':
+        return 'A class with that name already exists.';
       case 'SEATS_IN_USE':
         return 'Seats cannot go below the seats already taken.';
       default:
@@ -269,6 +271,10 @@ export default function App() {
   );
   const presetTaken = presetMatch ? presetMatch.heldSeats + presetMatch.confirmedSeats : 0;
   const presetSeatsValue = presetSeats ?? (presetMatch ? String(presetMatch.totalSeats) : '100');
+  const customName = newClassName.trim();
+  const customMatch = customName
+    ? classes.find((item) => item.name.toLowerCase() === customName.toLowerCase())
+    : undefined;
 
   useEffect(() => {
     if (studentId) {
@@ -378,6 +384,11 @@ export default function App() {
 
     if (!name || !Number.isInteger(seats) || seats < 1) {
       pushToast('error', 'Enter a class name and a seat count of at least 1.');
+      return;
+    }
+
+    if (customMatch) {
+      pushToast('error', `Class "${name}" already exists. Use the pickers above to update it.`);
       return;
     }
 
@@ -624,6 +635,11 @@ export default function App() {
                       maxLength={200}
                       className="rounded-xl border bg-white px-3 py-2"
                     />
+                    {customMatch && (
+                      <span className="text-xs text-amber-700">
+                        This class already exists. Update it with the pickers above.
+                      </span>
+                    )}
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
                     <span className="text-xs font-medium text-slate-500">Total seats</span>
@@ -638,7 +654,7 @@ export default function App() {
                   <div className="flex items-end">
                     <button
                       type="submit"
-                      disabled={saving || !newClassName.trim()}
+                      disabled={saving || !newClassName.trim() || Boolean(customMatch)}
                       className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 disabled:text-slate-400"
                     >
                       {saving ? 'Creating…' : 'Create custom class'}
